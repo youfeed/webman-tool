@@ -661,10 +661,11 @@ if (!function_exists('useValidate')) {
                 return (string) ($param ?? $args);
             },
             'array' => function ($field, $param, $args, $msg = '') {
-                return (array) ($param ?? $args);
+                return (array) ($param ?? (json_decode("[$args]",true)));
             },
             'object' => function ($field, $param, $args, $msg = '') {
-                return (object) ($param ?? $args);
+                // return [$field, $param, $args, $msg];
+                return (object) ($param ?? (json_decode("{{$args}}",false)));
             },
             'sprintf' => function ($field, $param, $args = '', $msg = '') {
                 return sprintf($args, $param);
@@ -877,103 +878,84 @@ if (!function_exists('useValidate')) {
                 throw new Exception(sprintf($message, $field, $min, $max));
             }
         ];
-        // 核心：递归处理规则（支持数据流转）
-        $processRule = function ($field, $value, $rule) use (&$processRule, $presets) {
-            // 1. 字符串规则（单规则/多规则组合，支持数据流转）
-            if (is_string($rule)) {
-                @[$lambda, $customMsg] = explode('#', $rule . '#', 2);
-                $lambdas = explode('|', $lambda);
-
-                // 关键：遍历多规则时，前一个规则的处理结果作为后一个的输入
-                foreach ($lambdas as $_lambda) {
-                    @[$ruleName, $ruleArgs] = explode(':', $_lambda, 2);
-                    $method = $presets[$ruleName] ?? null;
-
-                    if (!$method)
-                        continue;
-
-                    // 执行规则：处理后的值覆盖原value（流转核心）
-                    try {
-                        $value = $method($field, $value, $ruleArgs);
-                    } catch (Exception $e) {
-                        // 自定义错误信息优先
-                        throw new Exception($e->getMessage());
-                    }
-                }
-                return $value;
-            }
-
-            // 2. 闭包规则（自定义预处理，结果流转）
-            if (is_callable($rule)) {
-                try {
-                    // 闭包返回的预处理结果，作为后续规则的输入
-                    return $rule($field, $value);
-                } catch (Exception $e) {
-                    throw new Exception($e->getMessage());
-                }
-            }
-
-            // 3. 索引数组 = 流水线规则（多步骤流转）
-            if (array_is_list($rule)) {
-                // 3.1 一维数组规则：单元素索引数组 ['rule'] → 遍历每个元素校验
-                if (count($rule) === 1) {
-                    if (!is_array($value)) {
-                        throw new Exception("{$field}：必须是一维数组（需遍历每个元素校验）");
-                    }
-                    $result = [];
-                    foreach ($value as $index => $item) {
-                        $itemPath = "{$field}[{$index}]";
-                        // 对数组每个元素，递归执行单条规则
-                        $result[$index] = $processRule($itemPath, $item, $rule[0]);
-                    }
-                    return $result;
-                }
-                // 3.2 流水线规则：多元素索引数组 [rule1, rule2] → 步骤流转处理
-                if (count($rule) > 1) {
-                    $currentValue = $value;
-                    foreach ($rule as $stepIdx => $step) {
-                        $stepPath = "{$field}";
-                        // 流水线每一步结果流转
-                        $currentValue = $processRule($stepPath, $currentValue, $step);
-                    }
-                    return $currentValue;
-                }
-            }
-
-            // 4. 关联数组 = 单个对象规则（子字段数据流转）
-            if (is_array($rule) && !array_is_list($rule)) {
-                if (!is_array($value))
-                    $value = [];
-                $result = [];
-                foreach ($rule as $key => $subRule) {
-                    $subPath = "{$field}.{$key}";
-                    // 子字段处理结果流转
-                    $result[$key] = $processRule($subPath, $value[$key] ?? null, $subRule);
-                }
-                return $result;
-            }
-
-            throw new Exception("{$field}：不支持的规则类型");
-        };
-
-        // try-catch 统一处理异常
+        // 递归处理
         try {
             foreach ($rules as $field => $rule) {
-                // 核心：当前字段的处理结果
-                $params[$field] = $processRule(
-                    $field,
-                    $params[$field] ?? null,
-                    $rule,
-                );
+                // 初始化当前字段值
+                @[$field=>$param] = $params;
+                // 1. 处理可迭代规则（数组类型规则）
+                if(is_iterable($rule)){
+                    // 1.1 索引数组：流水线/数组元素遍历
+                    if(array_is_list($rule)){
+                        if(count($rule) == 1){
+                            if (!is_array($param)) {
+                                throw new Exception("{$field}：必须是一维数组");
+                            }
+                            // 值遍历
+                            foreach ($params[$field] as $index => $paraming) {
+                                @['err'=>$err,'msg'=>$msg,$index=>$callback] = $back = useValidate([$index => $paraming],[$index => $rule[0]],$intersect);
+                                if($err === 400){ throw new Exception("$msg"); }
+                                $params[$field][$index] = $callback;
+                            }
+                        // 流水线规则遍历
+                        }else{
+                            foreach($rule as $_rule){
+                                @[$field=>$current] = $params;
+                                @['err'=>$err,'msg'=>$msg,$field=>$callback] = $back = useValidate([$field=>$current],[$field=>$_rule],$intersect);
+                                if($err === 400){ throw new Exception("$field.$msg"); }
+                                $params[$field] = $callback;
+                            }
+                        }
+
+                    // 1.2 关联数组：单个对象规则（子字段数据流转）
+                    }else{
+                        @['err'=>$err,'msg'=>$msg] = $callback = useValidate($param, $rule, $intersect);
+                        if($err === 400){ throw new Exception("$field.$msg"); }
+                        $params[$field] = $callback;
+                    }
+                    continue;
+                }
+                // 闭包回调规则
+                if(is_callable($rule)){
+                    try {
+                    // 闭包返回的预处理结果，作为后续规则的输入
+                        $params[$field] = $rule($field, $param);
+                    } catch (Exception $e) {
+                        throw new Exception($e->getMessage(),400);
+                    }
+                    continue;
+                }
+                // 2. 处理字符串规则（单规则/多规则组合） expression
+                if(is_string($rule)){
+                    @[$expression, $customMsg] = explode('#', $rule);
+                    $pipeline = explode('|', $expression);
+                    $required = str_contains($expression,'required') || str_contains($expression,'require');
+                    foreach ($pipeline as $step) {
+                        @[$ruleName, $ruleParam] = explode(':', $step, 2);
+                        @[$ruleName=>$method] = $presets;
+                        // 非必填且值为null，或规则不存在时跳过（支持默认值）
+                        if(($param === null && $required === false) || $method === null){
+                            // 类型转换规则的默认值处理
+                            if(in_array($ruleName,['int','bool','float','string','array','object']) && !is_null($ruleParam)){
+                                $param = $method($field,$param,$ruleParam); // 更新param值，确保后续规则能使用
+                                $params[$field] = $param;
+                            }
+                            continue; 
+                        }
+                        // 执行验证规则
+                        $args = [$field, $param, $ruleParam];
+                        if($customMsg){
+                            array_push($args, $customMsg);
+                        }
+                        $param = $method(...$args);
+                        $params[$field] = $param;
+                        // 更新param为最新值，支持规则流转（前一个规则结果作为后一个输入）
+                    }
+                }
             }
-            // 验证成功：返回交集/全部数据（基于最终处理后的参数）
-            return $intersect
-                ? array_intersect_key($params, $rules)
-                : $params;
-        } catch (Exception $e) {
-            // 统一返回错误格式
+            return $intersect ? array_intersect_key($params,$rules) : $params;
+        }catch (Exception $e) {
             return ['err' => 400, 'msg' => $e->getMessage()];
         }
-
     }
 }
