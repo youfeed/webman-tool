@@ -1395,7 +1395,7 @@ if (!function_exists('pluginConfig')) {
      */
     function pluginConfig(?string $key = null, mixed $default = null)
     {
-        return config("plugin.youloge.tools.$key", $default);
+        return config("plugin.youloge.tools.app.$key", $default);
     }
 }
 if (!function_exists('array_is_list')) {
