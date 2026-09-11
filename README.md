@@ -10,18 +10,18 @@
 | useCache | 缓存器 | 缓存读写支持多模式 |
 | useLimit | 限速器 | 支持固定/滑动窗口 |
 | useIncrBy | 自增器 | 封装成一个函数 |
-| useAuthenticator | TOTP认证器 | 支持生成验证返回多合一 |
 | useQueue | 队列封装 | 方便调用 |
 | useRequest | 异步请求 | 方便调用 |
+| headRequest | HEAD请求 | 方便调用 |
 | httpProxy | 代理请求 | 方便调用 |
 | virtualFile | 文件上传 | 虚拟生成文件 |
 | apiMeilisearch | 搜索请求封装 | 方便调用 |
 | vipMeilisearch | 搜索管理封装 | 方便调用 |
+| useAuthenticator | TOTP认证器 | 支持生成验证返回多合一 |
 | ---- | 算法相关 | ---- |
 | useBase58 | 短码加解码 | 适合生成短码(同个数字生成短码也不相同) |
 | useBase64_encode | 安全Base64编码 | 方便调用 |
 | useBase64_decode | 安全Base64解码 | 方便调用 |
-| useBase64_encode | 代理请求 | 方便调用 |
 | useAES128 | 加解密封装 | 方便调用 |
 | useAES256 | 加解密封装 | 方便调用 |
 | useYouloge | 洋葱加密 | 适合各种Token签发 |
@@ -71,6 +71,7 @@ return $config;
 
 [Github Youloge.Tool](https://github.com/youfeed/webman-tool) Star 我 `有帮助的话，记得给个star` 能提交点代码最好
 
+- 2.1.0 [2026-09-12] 新增`headRequest`,`useBase32`
 - 2.0.4 [2026-09-12] 修正包命名为`webman-tool`
 - 2.0.1 [2026-09-11] 全新`V2`版本 一般已`use开头`
 - 1.0.0 [2025-03-15]-[2026-03-11] V1版本不在更新先升级为全新`V2`版本
@@ -184,6 +185,18 @@ useRequest('https://example.com/',['method' => 'POST','headers'=>[]])
 httpProxy('https://example.com/',['method' => 'POST','headers'=>[]]); // 与 useRequest 一样使用
 ```
 
+### `HEAD请求` - `headRequest`
+> 用来判断网址联通情况或者判断文件是否存在等
+- @param string $url 完整URL
+- @param array $options 请求参数（如headers）
+- @return array 
+- 成功 ['Headers'=>[], 'Request'=>[]]
+- 失败 ['err'=>500,'msg'=>'错误信息']
+```php
+headRequest('https://example.com/',['headers'=>[]]); // 与 useRequest 一样使用
+```
+
+
 ### `虚拟文件上传` - `useVirtualFile`
 - @param string $url 上传地址
 - @param array $files 文件类型数据 ['表单名称'=>['name'=>'文件名称','mime'=>'文件类型','data'=>'数据内容']]
@@ -196,6 +209,14 @@ useVirtualFile('https://upload.com/',[['file'=>['name'=>'test.txt','mime'=>'text
 ```
 
 > 算法相关
+
+### `返回指定长度Base32` - `useBase32`
+- 适用于：验证码随机字符场景
+- @param int $len 长度 默认5
+- @return string Base32字符串
+```php
+$uuid = useBase32(6); // 返回6位Base32字符串
+```
 
 ### `Base58编码解码` - `useBase58`
 - @param int|string $input int：编码数字 string：解码字符串

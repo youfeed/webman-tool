@@ -305,6 +305,32 @@ if (!function_exists('httpProxy')) {
         }
     }
 }
+if(!function_exists('headRequest')){
+    /**
+     * 发起HEAD请求
+     * @param string $url 完整URL
+     * @param array $options 请求参数（如headers）
+     * @return array 
+     * 成功 成功 ['Headers'=>[], 'Request'=>[]]
+     * 失败 ['err'=>500,'msg'=>'错误信息']
+     */
+    function headRequest($url,$options=[]){
+        static $http;
+        $http || $http = new Workerman\Http\Client([
+            'max_conn_per_addr' => 128, // 每个域名最多维持多少并发连接
+            'keepalive_timeout' => 15,  // 连接多长时间不通讯就关闭
+            'connect_timeout' => 30,  // 连接超时时间
+            'timeout' => 30,  // 请求发出后等待响应的超时时间
+        ]);
+        try {
+            $response = $http->request($url, array_merge(['method' => 'HEAD', 'version' => '1.1'], $options));
+            return ['Headers' => $response->getHeaders(), 'Request' => json_decode((string)$response->getBody(), true) ?? $response->getBody()];
+        } catch (\Exception $e) {
+            return ['err' => 500, 'msg' => $e->getMessage()];
+        }
+        
+    }
+}
 if (!function_exists('virtualFile')) {
     /**
      * 生成虚拟文件对象并上传 - 支持多文件
@@ -423,6 +449,16 @@ if (!function_exists('vipMeilisearch')) {
  * = 算法相关
  * =============================
  */
+if(!function_exists('useBase32')){
+    /**
+     * 生成指定长度Base32字符
+     * @param int $len 长度 默认5
+     * @return string Base32字符串
+     */
+    function useBase32($len=5){
+        return substr(str_shuffle("23456789ABCDEFGHJKLMNPQRSTUVWXYZ"), 0, $len);
+    }
+}
 if (!function_exists('useBase58')) {
     /**
      * Base58编码解码 - 压缩数字
