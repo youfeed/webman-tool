@@ -19,6 +19,7 @@
 | vipMeilisearch | 搜索管理封装 | 方便调用 |
 | useAuthenticator | TOTP认证器 | 支持生成验证返回多合一 |
 | ---- | 算法相关 | ---- |
+| useBase32 | 生成指定长度字符 | 使用用来生成验证码 |
 | useBase58 | 短码加解码 | 适合生成短码(同个数字生成短码也不相同) |
 | useBase64_encode | 安全Base64编码 | 方便调用 |
 | useBase64_decode | 安全Base64解码 | 方便调用 |
