@@ -50,7 +50,7 @@
 - 已经内置函数 [ini()](https://www.workerman.net/plugin/153) 与 [useValidate()](https://www.workerman.net/plugin/153) 安装本插件那二个插件可以不用安装
 
 ### 配置文件
-配置位置：`config\plugin\youloge\webman-tool\app.php`
+配置位置：`config\plugin\youloge\tools\app.php`
 ```php
 <?php
 $config = [
