@@ -778,7 +778,49 @@ if (!function_exists('useQiniuDownload')) {
  * = 证书格式 1. ./file.pem 文件路径 PEM编码的证书/私钥|公钥 2. PEM格式的私钥|公钥
  * =============================
  */
-
+if (!function_exists('usePrivateKeySign')) {
+    /***
+     * 
+     * 私钥签名 - 配置路径：[{appid}.apiclient_key]
+     * @param string $string 待签名字符串
+     * @param string $appid 选择那个id下得的证书
+     * @return array
+     * 成功 [err=>200,data=>base64] 
+     * 失败 [err=>500,msg=>'签名错误']
+     */
+    function usePrivateKeySign($string, $appid)
+    {
+        try {
+            @['apiclient_key' => $apiclient_key] = pluginConfig("$appid");
+            openssl_sign($string, $raw_sign, openssl_pkey_get_private($apiclient_key), 'sha256WithRSAEncryption');
+            return ['err' => 200, 'data' => base64_encode($raw_sign)];
+        } catch (\Throwable $e) {
+            return ['err' => 500, 'msg' => $e->getMessage()];
+        }
+    }
+}
+if (!function_exists('usePublicKeyVerify')) {
+    /***
+     * 
+     * 公钥验签 - 配置路径：[{appid}.public_key]
+     * @param string $string 待签名字符串
+     * @param string $signature 待验签签名
+     * @param string $appid 选择那个id下得的证书
+     * @return array
+     * 成功 [err=>200,'msg'=>验签通过] 
+     * 失败 [err=>500, msg=>'签名错误']
+     */
+    function usePublicKeyVerify($string, $signature, $appid)
+    {
+        try {
+            @['public_key' => $public_key] = pluginConfig("$appid");
+            openssl_verify($string, $signature, openssl_pkey_get_public($public_key), 'sha256WithRSAEncryption');
+            return ['err' => 200, 'msg' => '验签通过'];
+        } catch (\Throwable $e) {
+            return ['err' => 500, 'msg' => $e->getMessage()];
+        }
+    }
+}
 if (!function_exists('useTencentRequest')) {
     /**
      * 构造腾讯云请求体 - 配置路径(一律小写)：[youloge.{appid}.secretid|secretkey]
@@ -828,25 +870,6 @@ if (!function_exists('useTencentRequest')) {
                 'data' => $data,
             ]
         ];
-    }
-}
-if (!function_exists('usePrivateKeySign')) {
-    /***
-     * 
-     * 私钥签名 - 配置路径：[{appid}.apiclient_key]
-     * @param string $string 待签名字符串
-     * @param string $appid 选择那个id下得的证书
-     * 返回数组 成功 [err=>200,data=>base64] 失败 [err=>500,msg=>'签名错误']
-     */
-    function usePrivateKeySign($string, $appid)
-    {
-        try {
-            @['apiclient_key' => $apiclient_key] = pluginConfig("$appid");
-            openssl_sign($string, $raw_sign, openssl_pkey_get_private($apiclient_key), 'sha256WithRSAEncryption');
-            return ['err' => 200, 'data' => base64_encode($raw_sign)];
-        } catch (\Throwable $e) {
-            return ['err' => 500, 'msg' => $e->getMessage()];
-        }
     }
 }
 if (!function_exists('useWeixinPayRequest')) {

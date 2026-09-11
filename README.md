@@ -4,9 +4,42 @@
 
 > 使用前看一下下面辅助函数：尤其注意`函数名称问题`
 
-- 代码风格极简 欢迎提交代码
-- 几行代码就能接入微信支付/支付宝
-- 一行代码生成一个虚拟文件并上传
+|  函数名   | 名称  | 使用场景  |
+|  :----  | -----  | ----:  |
+| useLock | 排它锁 | 并发抢占 |
+| useCache | 缓存器 | 缓存读写支持多模式 |
+| useLimit | 限速器 | 支持固定/滑动窗口 |
+| useIncrBy | 自增器 | 封装成一个函数 |
+| useAuthenticator | TOTP认证器 | 支持生成验证返回多合一 |
+| useQueue | 队列封装 | 方便调用 |
+| useRequest | 异步请求 | 方便调用 |
+| httpProxy | 代理请求 | 方便调用 |
+| virtualFile | 文件上传 | 虚拟生成文件 |
+| apiMeilisearch | 搜索请求封装 | 方便调用 |
+| vipMeilisearch | 搜索管理封装 | 方便调用 |
+| ---- | 算法相关 | ---- |
+| useBase58 | 短码加解码 | 适合生成短码(同个数字生成短码也不相同) |
+| useBase64_encode | 安全Base64编码 | 方便调用 |
+| useBase64_decode | 安全Base64解码 | 方便调用 |
+| useBase64_encode | 代理请求 | 方便调用 |
+| useAES128 | 加解密封装 | 方便调用 |
+| useAES256 | 加解密封装 | 方便调用 |
+| useYouloge | 洋葱加密 | 适合各种Token签发 |
+| ---- | 七牛相关 | ---- |
+| useQiniu | 七牛管理请求体 | 新版 |
+| useQiniuQbox | 七牛管理请求体 | 旧版 |
+| useQiniuToken | 七牛上传Token | 方便调用 |
+| useQiniuDownload | 七牛下载签名 | 方便调用 |
+| ---- | 支付与非对称 | ---- |
+| usePrivateKeySign | 私钥签名 | 方便调用 |
+| usePublicKeyVerify | 公钥验签 | 方便调用 |
+| useTencentRequest | 腾讯云请求体 | 一个函数搞定腾讯云API调用 |
+| useWeixinPayRequest | 微信支付请求体 | 一个函数搞定微信支付API调用 |
+| useWeixinPayVerify | 微信支付回调验证 | 方便调用 |
+| useWeixinPayDecryptV3 | 微信支付V3解码 | 方便调用 |
+| useAliPayRequest | 支付宝支付请求体 | 一个函数搞定支付包支付API调用 |
+| useAliPayVerify | 支付宝回调验签 | 方便调用 |
+
 
 ### 安装使用
 
