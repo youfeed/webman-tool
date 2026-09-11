@@ -1,6 +1,6 @@
 # Youloge.tool Webman 辅助函数工具箱
 
-![Brightgreen](https://img.shields.io/badge/@-micateam-brightgreen.svg) ![Packagist](https://img.shields.io/packagist/v/youloge/webman.tool) ![Languages](https://img.shields.io/github/languages/top/youfeed/webman.tool.svg) ![Packagist Downloads](https://img.shields.io/packagist/dt/youloge/webman.tool) ![License ](https://img.shields.io/packagist/l/youloge/webman.tool)
+![Brightgreen](https://img.shields.io/badge/@-micateam-brightgreen.svg) ![Packagist](https://img.shields.io/packagist/v/youloge/webman-tool) ![Languages](https://img.shields.io/github/languages/top/youfeed/webman-tool.svg) ![Packagist Downloads](https://img.shields.io/packagist/dt/youloge/webman-tool) ![License ](https://img.shields.io/packagist/l/youloge/webman-tool)
 
 > 使用前看一下下面辅助函数：尤其注意`函数名称问题`
 
@@ -43,14 +43,14 @@
 
 ### 安装使用
 
-> `composer require youloge/webman.tool`
+> `composer require youloge/webman-tool`
 
 - 如果要使用 `onRequest` 请求封装 请安装`composer require workerman/http-client`
 - 如果要使用 `onQueue` 队列封装 请安装`composer require workerman/redis-queue`
 - 已经内置函数 [ini()](https://www.workerman.net/plugin/153) 与 [useValidate()](https://www.workerman.net/plugin/153) 安装本插件那二个插件可以不用安装
 
 ### 配置文件
-配置位置：`config\plugin\youloge\webman.tool\app.php`
+配置位置：`config\plugin\youloge\webman-tool\app.php`
 ```php
 <?php
 $config = [
@@ -69,7 +69,7 @@ return $config;
 ```
 ### 项目地址
 
-[Github Youloge.Tool](https://github.com/youfeed/webman.tool) Star 我 `有帮助的话，记得给个star` 能提交点代码最好
+[Github Youloge.Tool](https://github.com/youfeed/webman-tool) Star 我 `有帮助的话，记得给个star` 能提交点代码最好
 
 - 2.0.1 [2026-09-11] 全新`V2`版本 一般已`use开头`
 - 1.0.0 [2025-03-15]-[2026-03-11] V1版本不在更新先升级为全新`V2`版本

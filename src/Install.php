@@ -9,7 +9,7 @@ class Install
      * @var array
      */
     protected static $pathRelation = array (
-  'config/plugin/youloge/webman.tool' => 'config/plugin/youloge/webman.tool',
+  'config/plugin/youloge/webman-tool' => 'config/plugin/youloge/webman-tool',
 );
 
     /**

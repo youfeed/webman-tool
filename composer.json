@@ -1,8 +1,8 @@
 {
-  "name": "youloge/webman.tool",
+  "name": "youloge/webman-tool",
   "type": "library",
   "license": "MIT",
-  "description": "Webman plugin youloge/webman.tool",
+  "description": "Webman plugin youloge/webman-tool",
   "require": {
   },
   "autoload": {
