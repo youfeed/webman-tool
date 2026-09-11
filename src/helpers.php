@@ -8,7 +8,6 @@
 // +----------------------------------------------------------------------
 use support\Db;
 use support\Redis;
-use Webman\Config;
 
 if (!function_exists('useLock')) {
     /**
@@ -20,11 +19,11 @@ if (!function_exists('useLock')) {
     function useLock($key, $param = 10)
     {
         $keys = "Lock:$key";
-        if(is_int($param)){
+        if (is_int($param)) {
             $token = uniqid('', true);
             return (Redis::set($keys, $token, 'EX', $param, 'NX') ? $token : false);
         }
-        if(is_string($param)){
+        if (is_string($param)) {
             $lua = <<<'LUA'
                 local v = redis.call('GET',KEYS[1])
                 if v == ARGV[1] then
@@ -33,7 +32,7 @@ if (!function_exists('useLock')) {
                     return 0
                 end
             LUA;
-            return (Redis::eval($lua,1, $keys, $param) === 1);
+            return (Redis::eval($lua, 1, $keys, $param) === 1);
         }
         return false;
     }
@@ -110,66 +109,6 @@ if (!function_exists('useLimit')) {
         return $locking ? Redis::eval($lua, 2, "limits:{$key}", "limits:{$key}.lock", time(), $ttl, $limit, $locking) : Redis::eval($lua, 1, "limit:{$key}", $limit, $ttl, $locking);
     }
 }
-if (!function_exists('apiMeilisearch')) {
-    /**
-     * Meilisearch API 请求
-     * @param string $route 路由
-     * @param array $params 参数
-     * @param string $method 方法
-     * @return array|string 返回数据
-     */
-    function apiMeilisearch($route, $params = [], $method = 'GET')
-    {
-        static $http;
-        $http = $http ?: new Workerman\Http\Client();
-        @['host'=>$host,'ak'=>$ak] = config('plugin.youloge.webman.tool.app.meilisearch');
-        // 基础数据
-        $options = [
-            'method' => $method,
-            'version' => '1.1',
-            'data' => $method == 'GET' ? http_build_query($params) : json_encode($params, 320),
-            'headers' => [
-                "Accept" => "application/json",
-                'Content-Type' => $method == 'GET' ? 'application/x-www-form-urlencoded' : 'application/json',
-                'Authorization' => "Bearer $ak"
-            ]
-        ];
-        // 请求数据 ?
-        $url = $method == 'GET' ? "$host/$route?" . http_build_query($params) : "$host/$route";
-        $data = (string) $http->request($url, $options)->getBody();
-        return json_decode($data, true) ?? $data;
-    }
-}
-if (!function_exists('vip_meilisearch')) {
-    /**
-     * Meilisearch 管理 API 请求
-     * @param string $route 路由
-     * @param array $params 参数
-     * @param string $method 方法
-     * @return array|string 返回数据
-     */
-    function vip_meilisearch($route, $params = [], $method = 'GET')
-    {
-        static $http;
-        $http = $http ?: new Workerman\Http\Client();
-        @['host'=>$host,'sk'=>$sk] = config('plugin.youloge.webman.tool.app.meilisearch');
-        @[$host] = config('gateway')['search'];
-        // 基础数据
-        $options = [
-            'method' => $method,
-            'version' => '1.1',
-            'data' => $method == 'GET' ? http_build_query($params) : json_encode($params, 320),
-            'headers' => [
-                "Accept" => "application/json",
-                'Content-Type' => $method == 'GET' ? 'application/x-www-form-urlencoded' : 'application/json',
-                'Authorization' => "Bearer $sk",
-            ]
-        ];
-        // 请求数据
-        $data = (string) $http->request("$host/$route", $options)->getBody();
-        return json_decode($data, true) ?? $data;
-    }
-}
 if (!function_exists('useIncrBy')) {
     /**
      * UUID自增编码器
@@ -193,32 +132,32 @@ if (!function_exists('useAuthenticator')) {
      * @return string 返回验证码
      * RFC4648 base32，Authenticator标准字符集 ABCDEFGHIJKLMNOPQRSTUVWXYZ234567
      */
-    function useAuthenticator($secret=null,$params=null)
+    function useAuthenticator($secret = null, $params = null)
     {
         $char = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; // Base32字符集
         // 生成 $secret = issuer:account
-        if(str_contains($secret, ':')){
-            [$issuer,$account] = explode(':', $secret, 2);
+        if (str_contains($secret, ':')) {
+            [$issuer, $account] = explode(':', $secret, 2);
             $length = is_int($params) ? $params : 16;
             for ($i = 0; $i < $length; $i++) {
                 $secret .= $char[rand(0, strlen($char) - 1)];
             }
             $label = "$account:$issuer";
             return [
-                'label'=>"$label",
-                'secret'=>$secret,
-                'issuer'=>$issuer,
-                'account'=>$account,
-                'link'=>"otpauth://totp/$account:$issuer?secret=$secret&issuer=$issuer"
+                'label' => "$label",
+                'secret' => $secret,
+                'issuer' => $issuer,
+                'account' => $account,
+                'link' => "otpauth://totp/$account:$issuer?secret=$secret&issuer=$issuer"
             ];
         }
         $secret = strtoupper(trim($secret));
         $base32Pattern = '/^[A-Z234567]+$/';
         if (!preg_match($base32Pattern, $secret)) {
-            throw new \InvalidArgumentException('TOTP密钥非法',102002);
+            throw new \InvalidArgumentException('TOTP密钥非法', 102002);
         }
         // 
-        
+
         $char = array_flip(str_split('ABCDEFGHIJKLMNOPQRSTUVWXYZ234567')); // Base32字符集
         $length = strlen($secret);
         $buffer = 0;
@@ -236,10 +175,10 @@ if (!function_exists('useAuthenticator')) {
             }
         }
         $time = null;
-        if($params === null){
+        if ($params === null) {
             $time = floor(time() / 30);
         }
-        if(is_int($params)){
+        if (is_int($params)) {
             $time = floor($time / 30);
         }
         // 生成3组 6位验证码
@@ -256,100 +195,14 @@ if (!function_exists('useAuthenticator')) {
             ) % pow(10, 6);
             $item = str_pad($code, 6, '0', STR_PAD_LEFT);
         }
-        return is_string($params) ? in_array($params,$pool) : $pool;
+        return is_string($params) ? in_array($params, $pool) : $pool;
     }
 }
-if (!function_exists('rand_base32')) {
-    /**
-     * 生成指定长度 - 用于验证码
-     * 使用Base32字符集：ABCDEFGHIJKLMNOPQRSTUVWXYZ234567
-     *
-     * @param int $len 长度
-     * @return string 不重复的验证码
-     */
-    function rand_base32($len = 4)
-    {
-        return substr(str_shuffle("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"), 0, $len);
-    }
-}
-if (!function_exists('secret_base32')) {
-    /**
-     * 生成指定长度 - 用于密钥
-     * 
-     * 自行拼装 otpauth://totp/{label}?secret={secret}&issuer={issuer}
-     * 
-     * @param int|16 $len=16 可选：长度默认16
-     * @param string|'' $prefix='' 可选：密钥前缀
-     * 
-     * @return string 返回密钥
-     */
-    function secret_base32($len = 16, $prefix = '')
-    {
-        $char = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; // Base32字符集
-        for ($i = 0; $i < $len; $i++) {
-            $prefix .= $char[rand(0, strlen($char) - 1)];
-        }
-        return $prefix;
-    }
-}
-if (!function_exists('useTOTP')) {
-    /**
-     * 基于时间的一次性密码 RFC6238
-     *
-     * Time-Based One-Time Password 
-     * 
-     * @param string $secret Base32编码的密钥
-     * @param int|null $time 可选：时间戳。默认为null，表示当前时间。
-     *
-     * @return array 返回三组验证码
-     *
-     * @throws \Exception 无。
-     *
-     * 示例：
-     * ```
-     * // 将数据加入名为 'email_tasks' 的队列，无延迟
-     * useTOTP('GQBWBS7AAEBECCUJ',1741877199);
-     * [893277,448721,854850]
-     * ```
-     */
-    function useTOTP($secret, $time = null)
-    {
-        $secret = str_replace('=', '', strtoupper($secret));
-        $time = floor(($time ?? time()) / 30);
-        $char = array_flip(str_split('ABCDEFGHIJKLMNOPQRSTUVWXYZ234567')); // Base32字符集
-        $length = strlen($secret);
-        $buffer = 0;
-        $bits = 0;
-        $key = '';
-        for ($i = 0; $i < $length; $i++) {
-            $buffer <<= 5;
-            $buffer |= $char[$secret[$i]];
-            $bits += 5;
-            // 当累积的位数达到或超过8位时，处理这些位
-            while ($bits >= 8) {
-                $byte = ($buffer & (0xFF << ($bits - 8))) >> ($bits - 8);
-                $key .= chr($byte);
-                $bits -= 8;
-            }
-        }
-        //
-        $pool = [$time - 1, $time, $time + 1];
-        foreach ($pool as &$item) {
-            $item = pack('N*', 0) . pack('N*', $item);
-            $hmac = hash_hmac('sha1', $item, $key, true);
-            $offset = ord(substr($hmac, -1)) & 0xF;
-            $code = (
-                ((ord($hmac[$offset]) & 0x7F) << 24) |
-                ((ord($hmac[$offset + 1]) & 0xFF) << 16) |
-                ((ord($hmac[$offset + 2]) & 0xFF) << 8) |
-                (ord($hmac[$offset + 3]) & 0xFF)
-            ) % pow(10, 6);
-            $item = str_pad($code, 6, '0', STR_PAD_LEFT);
-        }
-        return $pool;
-    }
-}
-
+/**
+ * =============================
+ * = 网络封装
+ * =============================
+ */
 if (!function_exists('useQueue')) {
     /** 
      * 队列封装 [webman-queue](https://www.workerman.net/doc/workerman/components/workerman-queue.html)
@@ -406,12 +259,13 @@ if (!function_exists('httpProxy')) {
      * 请求参数与 httpProxy == onRequest == http-client(request) 一样
      * @param string $url 请求网址
      * @param array $options 请求配置
+     * @param int $index 配置下标(默认0)
      */
-    function httpProxy($url, $options = [])
+    function httpProxy($url, $options = [], $index = 0)
     {
         try {
             @['method' => $method, 'headers' => $headers, 'data' => $data] = $options;
-            $proxy = config('youloge.proxy');
+            $proxy = pluginConfig('proxy')[$index];
             $is_list = array_is_list($proxy);
             $is_list && shuffle($proxy);
             @[['addr' => $addr, 'port' => $port, 'pass' => $pass]] = $is_list ? $proxy : [$proxy];
@@ -505,11 +359,135 @@ if (!function_exists('virtualFile')) {
         }
     }
 }
+if (!function_exists('apiMeilisearch')) {
+    /**
+     * Meilisearch API 请求
+     * @param string $route 路由
+     * @param array $params 参数
+     * @param string $method 方法
+     * @return array|string 返回数据
+     */
+    function apiMeilisearch($route, $params = [], $method = 'GET')
+    {
+        static $http;
+        $http = $http ?: new Workerman\Http\Client();
+        @['host' => $host, 'ak' => $ak] = pluginConfig('meilisearch');
+        // 基础数据
+        $options = [
+            'method' => $method,
+            'version' => '1.1',
+            'data' => $method == 'GET' ? http_build_query($params) : json_encode($params, 320),
+            'headers' => [
+                "Accept" => "application/json",
+                'Content-Type' => $method == 'GET' ? 'application/x-www-form-urlencoded' : 'application/json',
+                'Authorization' => "Bearer $ak"
+            ]
+        ];
+        // 请求数据 ?
+        $url = $method == 'GET' ? "$host/$route?" . http_build_query($params) : "$host/$route";
+        $data = (string) $http->request($url, $options)->getBody();
+        return json_decode($data, true) ?? $data;
+    }
+}
+if (!function_exists('vipMeilisearch')) {
+    /**
+     * Meilisearch 管理 API 请求
+     * @param string $route 路由
+     * @param array $params 参数
+     * @param string $method 方法
+     * @return array|string 返回数据
+     */
+    function vipMeilisearch($route, $params = [], $method = 'GET')
+    {
+        static $http;
+        $http = $http ?: new Workerman\Http\Client();
+        @['host' => $host, 'sk' => $sk] = pluginConfig('meilisearch');
+        // 基础数据
+        $options = [
+            'method' => $method,
+            'version' => '1.1',
+            'data' => $method == 'GET' ? http_build_query($params) : json_encode($params, 320),
+            'headers' => [
+                "Accept" => "application/json",
+                'Content-Type' => $method == 'GET' ? 'application/x-www-form-urlencoded' : 'application/json',
+                'Authorization' => "Bearer $sk",
+            ]
+        ];
+        // 请求数据
+        $data = (string) $http->request("$host/$route", $options)->getBody();
+        return json_decode($data, true) ?? $data;
+    }
+}
 /**
  * =============================
  * = 算法相关
  * =============================
  */
+if (!function_exists('useBase58')) {
+    /**
+     * Base58编码解码 - 压缩数字
+     * @param int|string $input int：编码数字 string：解码字符串
+     * @param int $digits 随机混淆盐位数，默认3
+     * @return int|string 编码数字|解码字符串
+     */
+    function useBase58($input, $digits = 3)
+    {
+        $origin = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+        // 内部生成salt
+        $base58_salt = function (int $len): string {
+            $saltTable = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+            $out = '';
+            $max = strlen($saltTable) - 1;
+            for ($i = 0; $i < $len; $i++) {
+                $out .= $saltTable[random_int(0, $max)];
+            }
+            return $out;
+        };
+        // 数字 → encode编码
+        if (is_int($input)) {
+            $number = $input;
+            $chars = str_split($origin);
+            $salt = $base58_salt($digits);
+            if ($salt !== '') {
+                $seed = crc32($salt);
+                mt_srand($seed);
+                shuffle($chars);
+            }
+            $table = implode('', $chars);
+
+            $val = gmp_init($number);
+            $result = '';
+            do {
+                [$val, $mod] = gmp_div_qr($val, 58);
+                $result = $table[gmp_intval($mod)] . $result;
+            } while (gmp_cmp($val, 0) > 0);
+
+            return $salt . ($result === '' ? $table[0] : $result);
+        }
+        // 字符串 → decode解码
+        if (is_string($input)) {
+            $str = $input;
+            $salt = substr($str, 0, $digits);
+            $code = substr($str, $digits);
+
+            $chars = str_split($origin);
+            $seed = crc32($salt);
+            mt_srand($seed);
+            shuffle($chars);
+            $table = implode('', $chars);
+
+            $val = gmp_init(0);
+            $len = strlen($code);
+            for ($i = 0; $i < $len; $i++) {
+                $c = $code[$i];
+                $pos = strpos($table, $c);
+                $val = gmp_add(gmp_mul($val, 58), $pos);
+            }
+            return gmp_intval($val);
+        }
+        throw new InvalidArgumentException('输入只支持 int(编码) / string(解码)');
+    }
+}
 if (!function_exists('useBase64_encode')) {
     /**
      * 安全的base64编码
@@ -525,11 +503,298 @@ if (!function_exists('useBase64_decode')) {
      * 安全的base64解码
      * @param string $data 待解码的数据
      */
-    function useBase64_decode($data,$strict=false)
+    function useBase64_decode($data, $strict = false)
     {
-        return base64_decode(str_replace(['-', '_'], ['+', '/'], $data),$strict);
+        return base64_decode(str_replace(['-', '_'], ['+', '/'], $data), $strict);
     }
 }
+if (!function_exists('useAES128')) {
+    /**
+     * AES-128-CBC 加密解密
+     * 
+     * @param string|array $input array=加密(数组转json加密)，string=解密(传入加密串)
+     * @param string $salt 密钥原材料
+     * @return array|string|false 加密返回safe-base64字符串；解密返回原数组；失败false
+     */
+    function useAES128($input, $salt = '')
+    {
+        // 派生密钥
+        $key = hash_hkdf('sha256', $salt, 16);
+        try {
+            // 加密
+            if (is_array($input)) {
+                $jsonStr = json_encode($input, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $iv = openssl_random_pseudo_bytes(16); // CBC固定16字节iv
+                $cipherRaw = openssl_encrypt($jsonStr, 'AES-128-CBC', $key, OPENSSL_RAW_DATA, $iv);
+                if ($cipherRaw === false) {
+                    return false;
+                }
+                // iv(16字节) + 密文，然后url安全base64
+                return useBase64_encode($iv . $cipherRaw);
+            }
+            // 解密
+            if (is_string($input)) {
+                $raw = useBase64_decode($input);
+                if (strlen($raw) < 16) {
+                    return false;
+                }
+                // 前16字节IV，后面是密文
+                $iv = substr($raw, 0, 16);
+                $cipherRaw = substr($raw, 16);
+                $decryptStr = openssl_decrypt($cipherRaw, 'AES-128-CBC', $key, OPENSSL_RAW_DATA, $iv);
+                if ($decryptStr === false) {
+                    return false;
+                }
+                $data = json_decode($decryptStr, true);
+                return $data;
+            }
+            return false;
+        } catch (\Throwable $th) {
+            return false;
+        }
+    }
+}
+if (!function_exists('useAES256')) {
+    /**
+     * AES-256-CBC 加密解密
+     * 
+     * @param string|array $input array=加密(数组转json加密)，string=解密(传入加密串)
+     * @param string $salt 密钥原材料
+     * @return array|string|false 加密返回safe-base64字符串；解密返回原数组；失败false
+     */
+    function useAES256($input, $salt = '')
+    {
+        // 派生密钥
+        $key = hash_hkdf('sha256', $salt, 32);
+        try {
+            // 加密
+            if (is_array($input)) {
+                $jsonStr = json_encode($input, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $iv = openssl_random_pseudo_bytes(16); // CBC固定16字节iv
+                $cipherRaw = openssl_encrypt($jsonStr, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
+                if ($cipherRaw === false) {
+                    return false;
+                }
+                // iv(16字节) + 密文，然后url安全base64
+                return useBase64_encode($iv . $cipherRaw);
+            }
+            // 解密
+            if (is_string($input)) {
+                $raw = useBase64_decode($input);
+                if (strlen($raw) < 16) {
+                    return false;
+                }
+                // 前16字节IV，后面是密文
+                $iv = substr($raw, 0, 16);
+                $cipherRaw = substr($raw, 16);
+                $decryptStr = openssl_decrypt($cipherRaw, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
+                if ($decryptStr === false) {
+                    return false;
+                }
+                $data = json_decode($decryptStr, true);
+                return $data;
+            }
+            return false;
+        } catch (\Throwable $th) {
+            return false;
+        }
+    }
+}
+if (!function_exists('useYouloge')) {
+    /**
+     * Youloge 洋葱加解密(不含签名验证)
+     * @param string|array $input 待加密的数据
+     * @param string $appid 配置参数主键 默认`youloge`
+     * @return string|false 加密返回safe-base64字符串；解密返回原字符串；失败false
+     */
+    function useYouloge($input, $appid = 'youloge')
+    {
+        try {
+            @['apikey' => $apikey, 'secret' => $secret] = pluginConfig($appid);
+            if ($apikey === '' || $secret === '') {
+                return false;
+            }
+
+            $binary = useBase64_decode($secret);
+            if ($binary === false || strlen($binary) < 64) {
+                return false;
+            }
+            $keyInner = substr($binary, 0, 32);
+            $keyOuter = substr($binary, 32, 32);
+
+            // 加密
+            if (is_array($input)) {
+                $jsonRaw = json_encode($input, 320);
+                $ivInner = openssl_random_pseudo_bytes(16);
+                $innerBin = openssl_encrypt($jsonRaw, 'AES-256-CBC', $keyInner, OPENSSL_RAW_DATA, $ivInner);
+                if ($innerBin === false) return false;
+
+                $ivOuter = openssl_random_pseudo_bytes(16);
+                $outerBin = openssl_encrypt($innerBin, 'AES-256-CBC', $keyOuter, OPENSSL_RAW_DATA, $ivOuter);
+                if ($outerBin === false) return false;
+
+                // 打包：外层IV + 内层IV + 外层密文
+                $packBin = $ivOuter . $ivInner . $outerBin;
+                return useBase64_encode($packBin);
+            }
+
+            // 解密
+            if (is_string($input)) {
+                $rawBin = useBase64_decode($input);
+                if ($rawBin === false || strlen($rawBin) < 32) {
+                    return false;
+                }
+                $ivOuter = substr($rawBin, 0, 16);
+                $ivInner = substr($rawBin, 16, 16);
+                $cipherOuterBin = substr($rawBin, 32);
+
+                $innerBin = openssl_decrypt($cipherOuterBin, 'AES-256-CBC', $keyOuter, OPENSSL_RAW_DATA, $ivOuter);
+                if ($innerBin === false) return false;
+
+                $jsonStr = openssl_decrypt($innerBin, 'AES-256-CBC', $keyInner, OPENSSL_RAW_DATA, $ivInner);
+                if ($jsonStr === false) return false;
+
+                $result = json_decode($jsonStr, true);
+                return $result ?? false;
+            }
+            return false;
+        } catch (\Throwable $th) {
+            return false;
+        }
+    }
+}
+/**
+ * =============================
+ * = 七牛相关
+ * =============================
+ */
+
+if (!function_exists('useQiniu')) {
+    /**
+     * 七牛管理凭证-新版
+     * @param string $method 请求方式 GET/POST/PUT/DELETE
+     * @param string $uri 请求网址路径，支持 api.qiniu.com/xxx 或 https://api.qiniu.com/xxx
+     * @param array $query 查询参数
+     * @param array|string $body 请求内容，数组自动json_encode
+     * @param string $appid 配置参数主键 默认`qiniu`
+     */
+    function useQiniu($method, $uri, $query = [], $body = '', $appid = 'qiniu')
+    {
+        @['ak' => $ak, 'sk' => $sk] = pluginConfig($appid);
+        $url = str_starts_with($uri, 'https://') ? $uri : 'https://' . $uri;
+        @['scheme' => $scheme, 'host' => $host, 'path' => $path, 'query' => $queryString] = parse_url($url);
+
+        $urlQueryArr = [];
+        if (!empty($queryString)) {
+            parse_str($queryString, $urlQueryArr);
+        }
+        $finalQuery = http_build_query(array_merge($urlQueryArr, $query));
+        $signUri = $finalQuery === '' ? $path : "$path?$finalQuery";
+
+        $bodyRaw = is_string($body) ? $body : json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $xQiniuDate = gmdate('Ymd\THis\Z');
+        $signRaw = "{$method} {$signUri}\nHost: {$host}\nX-Qiniu-Date: {$xQiniuDate}\n\n{$bodyRaw}";
+
+        $hmacRaw = hash_hmac('sha1', $signRaw, $sk, true);
+        $sign = rtrim(strtr(base64_encode($hmacRaw), '+/', '-_'), '=');
+        $authHeader = "Qiniu {$ak}:{$sign}";
+        $method = strtoupper($method);
+        $finalUrl = "https://{$host}{$signUri}";
+
+        $headers = [
+            'Authorization' => $authHeader,
+            'Host' => $host,
+            'X-Qiniu-Date' => $xQiniuDate,
+            'Content-Type' => 'application/json',
+        ];
+
+        return [$finalUrl, [
+            'method' => $method,
+            'headers' => $headers,
+            'body' => $bodyRaw
+        ]];
+    }
+}
+if (!function_exists('useQiniuQbox')) {
+    /**
+     * 七牛管理凭证-旧版(rs.qiniu.com / rsf.qiniu.com / fusion.qiniuapi.com)
+     * @param string $method 请求方式 GET/POST/PUT/DELETE
+     * @param string $uri 请求网址路径
+     * @param array $query 查询参数
+     * @param array $body 请求内容
+     * @param string $appid 配置参数主键 默认`qiniu`
+     */
+    function useQiniuQbox($method, $uri, $query = [], $body = '', $appid = 'qiniu')
+    {
+        @['ak' => $ak, 'sk' => $sk] = pluginConfig($appid);
+        $url = str_starts_with($uri, 'https://') ? $uri : 'https://' . $uri;
+        @['scheme' => $scheme, 'host' => $host, 'path' => $path, 'query' => $queryString] = parse_url($url);
+        // 解析url自带query
+        $queryString && parse_str($queryString, $urlQueryArr);
+        $finalQuery = http_build_query(array_merge($urlQueryArr ?? [], $query));
+        $signUri = $finalQuery === '' ? $path : "$path?$finalQuery";
+        // QBox 签名串 uri\nbody
+        $bodyRaw = is_string($body) ? $body : json_encode($body, 320);
+        $signRaw = $signUri . "\n" . $bodyRaw;
+        $hmacRaw = hash_hmac('sha1', $signRaw, $sk, true);
+        $sign = rtrim(strtr(base64_encode($hmacRaw), '+/', '-_'), '=');
+        $authHeader = "QBox {$ak}:{$sign}";
+        $method = strtoupper($method);
+        return ["https://{$host}{$signUri}", [
+            'method' => $method,
+            'headers' => [
+                'Authorization' => $authHeader,
+                'Content-Type' => $method === 'GET' ? 'application/x-www-form-urlencoded' : 'application/json',
+            ],
+            'data' => $bodyRaw
+        ]];
+    }
+}
+if (!function_exists('useQiniuToken')) {
+    /**
+     * 七牛上传Token
+     * @param array $params 待签名数组对象
+     * @param string $appid 配置参数主键 默认`qiniu`
+     * @return string 返回上传Token
+     */
+    function useQiniuToken($params, $appid = 'qiniu')
+    {
+        @['ak' => $ak, 'sk' => $sk] = pluginConfig($appid);
+        $string = str_replace(['+', '/'], ['-', '_'], base64_encode(json_encode($params)));
+        $sign = str_replace(['+', '/'], ['-', '_'], base64_encode(hash_hmac('sha1', $string, $sk, true)));
+        return "$ak:$sign:$string";
+    }
+}
+if (!function_exists('useQiniuDownload')) {
+    /**
+     * 七牛下载签名
+     * @param string $url 待签名下载网址
+     * @param int $second 可选：设置有效时间 默认3600秒
+     * @param string $attname 可选：设置下载文件名 默认没有
+     * @param string $appid 配置参数主键 默认`qiniu`
+     * @return string 返回签名后的下载网址
+     */
+    function useQiniuDownload($url, $second = 3600, $attname = '', $appid = 'qiniu')
+    {
+        @['ak' => $AK, 'sk' => $SK] = pluginConfig($appid);
+        @['scheme' => $scheme, 'host' => $host, 'path' => $path, 'query' => $queryString] = parse_url($url);
+        $queryString && parse_str($queryString, $query);
+        $query['e'] = time() + $second;
+        $uri = sprintf("%s://%s%s", $scheme, $host, $path);
+        $string = sprintf('%s?%s', $uri, http_build_query($query));
+        $sign = str_replace(['+', '/'], ['-', '_'], base64_encode(hash_hmac('sha1', $string, $SK, true)));
+        $query['token'] = "$AK:$sign";
+        $attname && $query['attname'] = urlencode($attname);
+        return $uri . '?' . http_build_query($query);
+    }
+}
+/**
+ * =============================
+ * = 支付算法类 详细配置文件
+ * = 证书路径 {$appid}.{apiclient_key}
+ * = 证书格式 1. ./file.pem 文件路径 PEM编码的证书/私钥|公钥 2. PEM格式的私钥|公钥
+ * =============================
+ */
 
 if (!function_exists('useTencentRequest')) {
     /**
@@ -543,7 +808,7 @@ if (!function_exists('useTencentRequest')) {
      */
     function useTencentRequest($method, $endpoint_action_version_region, $payload, $appid)
     {
-        @['secretid' => $SecretId, 'secretkey' => $SecretKey] = config("youloge.$appid");
+        @['secretid' => $SecretId, 'secretkey' => $SecretKey] = pluginConfig("youloge.$appid");
         @[$Endpoint, $Action, $Version, $Region] = $tencent = explode('/', $endpoint_action_version_region);
         @[$Server] = explode('.', $Endpoint);
         $data = $payload ? json_encode($payload, 320) : '';
@@ -582,87 +847,18 @@ if (!function_exists('useTencentRequest')) {
         ];
     }
 }
-/**
- * 七牛签名 - 配置文件读取[youloge.qiniu.ak/sk]
- * qiniu_hmac 
- * 
- */
-if (!function_exists('qiniu_hmac')) {
-    /**
-     * 七牛HMAC - 
-     * @param string $string 待签名字符串
-     */
-    function qiniu_hmac($string)
-    {
-        @['ak' => $AK, 'sk' => $SK] = config('youloge.qiniu');
-        $sign = str_replace(['+', '/'], ['-', '_'], base64_encode(hash_hmac('sha1', $string, $SK, true)));
-        return "$AK:$sign";
-    }
-}
-if (!function_exists('qiniu_sign')) {
-    /**
-     * 七牛SIGN - 
-     * @param array $params 待签名数组对象
-     */
-    function qiniu_sign($params)
-    {
-        $string = str_replace(['+', '/'], ['-', '_'], base64_encode(json_encode($params)));
-        $sign = qiniu_hmac($string);
-        return "$sign:$string";
-    }
-}
-if (!function_exists('qiniu_auth')) {
-    /**
-     * 七牛AUTH - 
-     * @param array $params 待签名数组对象
-     * @param string $ContentType 可选：设置请求头 Content-Type 默认application/json
-     */
-    function qiniu_auth($params,$ContentType = "application/json")
-    {
-        @['ak' => $ak, 'sk' => $sk] = config('youloge.qiniu');
-        $string = str_replace(['+', '/'], ['-', '_'], base64_encode(json_encode($params,320)));
-        $sign = str_replace(['+', '/'], ['-', '_'], base64_encode(hash_hmac('sha1', $string, $sk, true)));
-        return ["Authorization: Qiniu $ak:$sign", "Content-Type: $ContentType"];
-    }
-}
-if (!function_exists('qiniu_download')) {
-    /**
-     * 七牛DOWN - 
-     * @param string $url 待签名下载网址
-     * @param int $second 可选：设置有效时间 默认3600秒
-     * @param string $attname 可选：设置下载文件名 默认没有
-     */
-    function qiniu_download($url, $second = 3600, $attname = '')
-    {
-        @['scheme' => $scheme, 'host' => $host, 'path' => $path, 'query' => $queryString] = parse_url($url);
-        $queryString && parse_str($queryString, $query);
-        $query['e'] = time() + $second;
-        $uri = sprintf("%s://%s%s", $scheme, $host, $path);
-        $query['token'] = qiniu_hmac(sprintf('%s?%s', $uri, http_build_query($query)));
-        $attname && $query['attname'] = urlencode($attname);
-        return $uri . '?' . http_build_query($query);
-    }
-}
-
-/**
- * =============================
- * = 支付算法类 详细配置文件
- * = 证书路径 youloge.{$appid}.{apiclient_key}
- * = 证书格式 1. ./file.pem 文件路径 PEM编码的证书/私钥|公钥 2. PEM格式的私钥|公钥
- * =============================
- */
-if (!function_exists('private_sign')) {
+if (!function_exists('usePrivateKeySign')) {
     /***
      * 
-     * 私钥签名 - 配置路径：[youloge.{appid}.apiclient_key]
+     * 私钥签名 - 配置路径：[{appid}.apiclient_key]
      * @param string $string 待签名字符串
      * @param string $appid 选择那个id下得的证书
      * 返回数组 成功 [err=>200,data=>base64] 失败 [err=>500,msg=>'签名错误']
      */
-    function private_sign($string, $appid)
+    function usePrivateKeySign($string, $appid)
     {
         try {
-            @['apiclient_key' => $apiclient_key] = config("youloge.$appid");
+            @['apiclient_key' => $apiclient_key] = pluginConfig("$appid");
             openssl_sign($string, $raw_sign, openssl_pkey_get_private($apiclient_key), 'sha256WithRSAEncryption');
             return ['err' => 200, 'data' => base64_encode($raw_sign)];
         } catch (\Throwable $e) {
@@ -670,19 +866,19 @@ if (!function_exists('private_sign')) {
         }
     }
 }
-if (!function_exists('weixin_request')) {
+if (!function_exists('useWeixinPayRequest')) {
     /***
-     * 构造微信支付请求体 - 配置路径：[youloge.{appid}.apiclient_key|serial_no...]
-     * 示例：weixin_request('GET','/v3/certificates',{},11111111);
+     * 构造微信支付请求体 - 配置路径：[{appid}.apiclient_key|serial_no...]
+     * useWeixinPayRequest('GET','/v3/certificates',{},11111111);
      * 
      * @param string $method 请求网络方式 GET/POST
      * @param string $router 请求网络路径 必须'/'开头
      * @param array $data JSON数据 不传设置为 '' false 0 即可
      * @param string $appid 选择那个商户id下得的证书
      */
-    function weixin_request($method, $router, $data = '', $appid = '')
+    function useWeixinPayRequest($method, $router, $data = '', $appid = '')
     {
-        @['apiclient_key' => $apiclient_key, 'serial_no' => $serial_no] = config("youloge.$appid");
+        @['apiclient_key' => $apiclient_key, 'serial_no' => $serial_no] = pluginConfig("$appid");
         $noncestr = session_create_id();
         $timestamp = (string) time();
         $body = $data ? json_encode($data, 320) : '';
@@ -697,18 +893,18 @@ if (!function_exists('weixin_request')) {
         return [sprintf('https://api.mch.weixin.qq.com%s', $router), ['method' => $method, 'headers' => $header, 'data' => $body]];
     }
 }
-if (!function_exists('weixin_verify')) {
+if (!function_exists('useWeixinPayVerify')) {
     /**
-     * 微信回调验签 - 配置路径：[youloge.{serial}.platform_cert]
+     * 微信回调验签 - 配置路径：[{serial}.platform_cert]
      * @param object $request Request 给返回对象传进来
      * 成功返回 对象返回JSON 否则返回 []
      * 失败返回 ['err'=>500,'msg'=>Exception]
      */
-    function weixin_verify($request)
+    function useWeixinPayVerify($request)
     {
         try {
             @['Wechatpay-Timestamp' => $Timestamp, 'Wechatpay-Nonce' => $Nonce, 'Wechatpay-Signature' => $Signature, 'Wechatpay-Serial' => $Serial] = $request->header();
-            @['platform_cert' => $platform_cert] = config("youloge.$Serial");
+            @['platform_cert' => $platform_cert] = pluginConfig("$Serial");
             $rawBody = $request->getContent();
             $verify = (bool) openssl_verify("$Timestamp\n$Nonce\n$rawBody\n", base64_decode($Signature), openssl_get_publickey($platform_cert), 'sha256WithRSAEncryption');
             return $verify ? $request->all() : [];
@@ -717,7 +913,7 @@ if (!function_exists('weixin_verify')) {
         }
     }
 }
-if (!function_exists('weixin_decrypt')) {
+if (!function_exists('useWeixinPayDecryptV3')) {
     /**
      * 微信解密V3 - 配置路径：[youloge.{mchid}.v3key]
      * @param array $encrypt 解密数据 要有['ciphertext','nonce','associated_data'] 
@@ -725,10 +921,10 @@ if (!function_exists('weixin_decrypt')) {
      * 成功返回 对象返回JSON 否则返回 ['raw'=>$raw]
      * 失败返回 ['err'=>500,'msg'=>Exception]
      */
-    function weixin_decrypt($encrypt, $mchid)
+    function useWeixinPayDecryptV3($encrypt, $mchid)
     {
         try {
-            @['v3key' => $v3key] = config("youloge.$mchid");
+            @['v3key' => $v3key] = pluginConfig("$mchid");
             @['ciphertext' => $ciphertext, 'nonce' => $nonce, 'associated_data' => $associated] = $encrypt;
             $cipher = base64_decode($ciphertext);
             $decrypt = openssl_decrypt(substr($cipher, 0, -16), 'aes-256-gcm', $v3key, OPENSSL_RAW_DATA, $nonce, substr($cipher, -16), $associated);
@@ -738,24 +934,30 @@ if (!function_exists('weixin_decrypt')) {
         }
     }
 }
-
-if (!function_exists('alipay_request')) {
+if (!function_exists('useAliPayRequest')) {
     /**
      * 构造支付宝支付请求体 - 配置路径：[appid.{appid}.apiclient_key]
-     * 示例：alipay_request('alipay.trade.create',$data,11111111);
+     * useAliPayRequest('alipay.trade.create',$data,11111111);
      * @param string $method  接口名称 alipay.trade.create ...
-     * @param array $data  待合并参数
+     * @param array $params  请求参数
      * @param string $appid  选择那个商户id下得的证书
      */
-    function alipay_request($method, $data, $appid)
+    function useAliPayRequest($method, $params, $appid)
     {
-        @['public' => $public, $method => $params] = config('youloge.alipay');
-        @['apiclient_key' => $apiclient_key] = config("youloge.$appid");
-        $body = array_merge($public, $params ?? [], $data ?? [], ['app_id' => $appid, 'method' => $method]);
+        @['apiclient_key' => $apiclient_key] = pluginConfig("$appid");
+        $public = [
+            'app_id' => $appid,
+            'method' => $method,
+            'version' => '1.0',
+            'format' => 'JSON',
+            'charset' => 'utf-8',
+            'sign_type' => 'RSA2',
+            'timestamp' => date('Y-m-d H:i:s')
+        ];
+        $body = array_merge($public, $params);
         ksort($body);
         openssl_sign(urldecode(http_build_query($body)), $raw_sign, openssl_pkey_get_private($apiclient_key), 'sha256WithRSAEncryption');
         $body['sign'] = base64_encode($raw_sign);
-        ;
         return [
             sprintf("https://openapi.alipay.com/gateway.do?%s", http_build_query($body)),
             [
@@ -767,17 +969,18 @@ if (!function_exists('alipay_request')) {
         ];
     }
 }
-if (!function_exists('alipay_verify')) {
+if (!function_exists('useAliPayVerify')) {
     /**
      * 支付宝验签 - 配置路径：[youloge.alipay.public_key]
      * @param object $request Request 给返回对象传进来
+     * @param string $appid  选择那个商户id下得的证书
      * 成功返回 对象返回JSON 否则返回 []
      * 失败返回 ['err'=>500,'msg'=>Exception]
      */
-    function alipay_verify($request)
+    function useAliPayVerify($request, $appid)
     {
         try {
-            @['public_key' => $alipay_public_key] = config('youloge.alipay');
+            @['public_key' => $alipay_public_key] = pluginConfig($appid);
             @['sign' => $sign, 'sign_type' => $sign_type] = $params = $request->all();
             unset($params['sign']);
             unset($params['sign_type']);
@@ -789,6 +992,12 @@ if (!function_exists('alipay_verify')) {
         }
     }
 }
+
+/**
+ * 扩展方法 
+ * 用于兼容 (PHP 8 <= 8.1.0) 7.2+
+ * 判断是否可循环数组
+ */
 if (!function_exists('ini')) {
     /**
      * 读取配置文件参数
@@ -814,18 +1023,6 @@ if (!function_exists('ini')) {
         return $two === null ? $item ?? $def : $item[$two] ?? $def;
     }
 }
-/**
- * 扩展方法 
- * 用于兼容 (PHP 8 <= 8.1.0) 7.2+
- * 判断是否可循环数组
- */
-if (!function_exists('array_is_list')) {
-    function array_is_list($arg)
-    {
-        return $arg === [] || (array_keys($arg) === range(0, count($arg) - 1));
-    }
-}
-
 if (!function_exists('useValidate')) {
     /**
      * 验证和处理表单数据
@@ -880,10 +1077,10 @@ if (!function_exists('useValidate')) {
                 return (string)(($param === null || $param === '') ? $args : $param);
             },
             'array' => function ($field, $param, $args, $msg = '') {
-                return (array)(($param === null || $param === '' || empty($param)) ? json_decode("[$args]",true) : $param);
+                return (array)(($param === null || $param === '' || empty($param)) ? json_decode("[$args]", true) : $param);
             },
             'object' => function ($field, $param, $args, $msg = '') {
-                return (object)(($param === null || $param === '' || empty($param)) ? json_decode("{{$args}}",false) : $param);
+                return (object)(($param === null || $param === '' || empty($param)) ? json_decode("{{$args}}", false) : $param);
             },
             'sprintf' => function ($field, $param, $args = '', $msg = '') {
                 return sprintf($args, $param);
@@ -1100,69 +1297,75 @@ if (!function_exists('useValidate')) {
         try {
             foreach ($rules as $field => $rule) {
                 // 初始化当前字段值
-                @[$field=>$param] = $params;
+                @[$field => $param] = $params;
                 // 1. 处理可迭代规则（数组类型规则）
-                if(is_iterable($rule)){
+                if (is_iterable($rule)) {
                     // 1.1 索引数组：流水线/数组元素遍历
-                    if(array_is_list($rule)){
-                        if(count($rule) == 1){
+                    if (array_is_list($rule)) {
+                        if (count($rule) == 1) {
                             if (!is_array($param)) {
                                 throw new Exception("{$field}：必须是一维数组");
                             }
                             // 值遍历
                             foreach ($params[$field] as $index => $paraming) {
-                                @['err'=>$err,'msg'=>$msg,$index=>$callback] = $back = useValidate([$index => $paraming],[$index => $rule[0]],$intersect);
-                                if($err === 400){ throw new Exception("$msg"); }
+                                @['err' => $err, 'msg' => $msg, $index => $callback] = $back = useValidate([$index => $paraming], [$index => $rule[0]], $intersect);
+                                if ($err === 400) {
+                                    throw new Exception("$msg");
+                                }
                                 $params[$field][$index] = $callback;
                             }
-                        // 流水线规则遍历
-                        }else{
-                            foreach($rule as $_rule){
-                                @[$field=>$current] = $params;
-                                @['err'=>$err,'msg'=>$msg,$field=>$callback] = $back = useValidate([$field=>$current],[$field=>$_rule],$intersect);
-                                if($err === 400){ throw new Exception("$field.$msg"); }
+                            // 流水线规则遍历
+                        } else {
+                            foreach ($rule as $_rule) {
+                                @[$field => $current] = $params;
+                                @['err' => $err, 'msg' => $msg, $field => $callback] = $back = useValidate([$field => $current], [$field => $_rule], $intersect);
+                                if ($err === 400) {
+                                    throw new Exception("$field.$msg");
+                                }
                                 $params[$field] = $callback;
                             }
                         }
 
-                    // 1.2 关联数组：单个对象规则（子字段数据流转）
-                    }else{
-                        @['err'=>$err,'msg'=>$msg] = $callback = useValidate($param, $rule, $intersect);
-                        if($err === 400){ throw new Exception("$field.$msg"); }
+                        // 1.2 关联数组：单个对象规则（子字段数据流转）
+                    } else {
+                        @['err' => $err, 'msg' => $msg] = $callback = useValidate($param, $rule, $intersect);
+                        if ($err === 400) {
+                            throw new Exception("$field.$msg");
+                        }
                         $params[$field] = $callback;
                     }
                     continue;
                 }
                 // 闭包回调规则
-                if(is_callable($rule)){
+                if (is_callable($rule)) {
                     try {
-                    // 闭包返回的预处理结果，作为后续规则的输入
+                        // 闭包返回的预处理结果，作为后续规则的输入
                         $params[$field] = $rule($field, $param);
                     } catch (Exception $e) {
-                        throw new Exception($e->getMessage(),400);
+                        throw new Exception($e->getMessage(), 400);
                     }
                     continue;
                 }
                 // 2. 处理字符串规则（单规则/多规则组合） expression
-                if(is_string($rule)){
+                if (is_string($rule)) {
                     @[$expression, $customMsg] = explode('#', $rule);
                     $pipeline = explode('|', $expression);
-                    $required = str_contains($expression,'required') || str_contains($expression,'require');
+                    $required = str_contains($expression, 'required') || str_contains($expression, 'require');
                     foreach ($pipeline as $step) {
                         @[$ruleName, $ruleParam] = explode(':', $step, 2);
-                        @[$ruleName=>$method] = $presets;
+                        @[$ruleName => $method] = $presets;
                         // 非必填且值为null，或规则不存在时跳过（支持默认值）
-                        if(($param === null && $required === false) || $method === null){
+                        if (($param === null && $required === false) || $method === null) {
                             // 类型转换规则的默认值处理
-                            if(in_array($ruleName,['int','bool','float','string','array','object']) && !is_null($ruleParam)){
-                                $param = $method($field,$param,$ruleParam); // 更新param值，确保后续规则能使用
+                            if (in_array($ruleName, ['int', 'bool', 'float', 'string', 'array', 'object']) && !is_null($ruleParam)) {
+                                $param = $method($field, $param, $ruleParam); // 更新param值，确保后续规则能使用
                                 $params[$field] = $param;
                             }
-                            continue; 
+                            continue;
                         }
                         // 执行验证规则
                         $args = [$field, $param, $ruleParam];
-                        if($customMsg){
+                        if ($customMsg) {
                             array_push($args, $customMsg);
                         }
                         $param = $method(...$args);
@@ -1171,14 +1374,12 @@ if (!function_exists('useValidate')) {
                     }
                 }
             }
-            return $intersect ? array_intersect_key($params,$rules) : $params;
-        }catch (Exception $e) {
+            return $intersect ? array_intersect_key($params, $rules) : $params;
+        } catch (Exception $e) {
             return ['err' => 400, 'msg' => $e->getMessage()];
         }
     }
 }
-
-
 if (!function_exists('pluginConfig')) {
     /**
      * Get config
@@ -1191,34 +1392,9 @@ if (!function_exists('pluginConfig')) {
         return config("plugin.youloge.webman.tool.$key", $default);
     }
 }
-if (!function_exists('config')) {
-    /**
-     * Get config
-     * @param string|null $key
-     * @param mixed $default
-     * @return mixed
-     */
-    function config(?string $key = null, mixed $default = null)
+if (!function_exists('array_is_list')) {
+    function array_is_list($arg)
     {
-        return Config::get($key, $default);
+        return $arg === [] || (array_keys($arg) === range(0, count($arg) - 1));
     }
-}
-
-/**
- * Get the base path of the application
- */
-if (!defined('BASE_PATH')) {
-    if (!$basePath = Phar::running()) {
-        $basePath = getcwd();
-        while ($basePath !== dirname($basePath)) {
-            if (is_dir("$basePath/vendor") && is_file("$basePath/start.php")) {
-                break;
-            }
-            $basePath = dirname($basePath);
-        }
-        if ($basePath === dirname($basePath)) {
-            $basePath = __DIR__ . '/../../../../../';
-        }
-    }
-    define('BASE_PATH', realpath($basePath) ?: $basePath);
 }

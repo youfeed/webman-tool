@@ -31,17 +31,8 @@ return [
 
 [Github Youloge.Tool](https://github.com/youfeed/webman.tool) Star 我 `有帮助的话，记得给个star` 能提交点代码最好
 
-- 1.5.0 [2026-03-11] `useValidate`升级为V2版本，并修复个别函数问题
-- 1.4.1 [2025-11-13] `useValidate`新增`sprintf`,`format`规则，格式化字符串
-- 1.4.0 [2025-10-25] `useValidate`优化`required`规则，允许`0、'0'、false、空数组`
-- 1.3.3 [2025-08-14] `useValidate`新增`array`和`object`数据类型
-- 1.3.0 [2025-08-12] `useValidate` 默认数据类型与默认值：数据类型修复为一致
-- 1.2.8 [2025-03-20] 增加`useValidate`基本数据类型`int:100`,`float:1.02`,`bool:false`,`string:默认值` 提供默认值支持
-- 1.2.7 [2025-03-16] 优化表单过滤器`useValidate`并拆分独立版本[Webman.validate](https://www.workerman.net/plugin/188)
-- 1.2.4 [`2025-03-15`] 新增输入过滤器`useValidate`优雅处理表单输入
-- 1.2.2 [2025-03-13] 新增谷歌令牌辅助函数 `secret_base32` => `useTOTP`
-- 1.0.1 增加 构造腾讯云请求体
-- 0.0.9 迁移多个辅助函数
+- 2.0.1 [2026-09-11] 全新`V2`版本 一般已`use开头`
+- 1.0.0 [2025-03-15]-[2026-03-11] V1版本不在更新先升级为全新`V2`版本
 
 
 ## 示例代码 - 辅助辅助 函数还是要配合代码食用才香~
@@ -49,17 +40,6 @@ return [
 ### 示例：`表单输入验证器` 查看使用详情文档 [webman.validate](https://www.workerman.net/plugin/edit/188)
 
 
-```php
-@[
-     'err' => $err, 'msg' => $msg, 
-     'uuid' => $uuid, 'payer' => $payer, 'encrypt' => $encrypt
-] = useValidate($request->all(), [
-     'uuid' => 'int:10000',
-     'payer' => 'required|string',
-     'package' => 'required|string',
-]);
-$err && throw new Exception($msg, $err);
-```
 ### `Redis排它锁` - `useLock`
 
 - @param string $key 实际key为`Lock:$key`
@@ -140,6 +120,7 @@ useAuthenticator('GQBWBS7AAEBECCUJ'); // 返回当前时间戳的验证码(3组)
 useAuthenticator('GQBWBS7AAEBECCUJ',1741877199); // 返回指定时间戳的验证码
 useAuthenticator('GQBWBS7AAEBECCUJ','123456'); // 验证'123456' 是否在当前时间戳的验证码范围
 ```
+
 ### `队列封装` - `useQueue`
 - @param string $queue 队列名称
 - @param array $data 数据
@@ -160,6 +141,15 @@ useQueue('y',['x'=>100,'y'=>200],10); // 添加数据到 y 队列 10秒后消费
 ```php
 useRequest('https://example.com/',['method' => 'POST','headers'=>[]])
 ```
+### `HTTP代理网络请求` - `httpProxy`
+> 使用的`curl` 以后改为`workerman-http-client`
+- @param string $url 请求网址
+- @param array $options 请求配置
+- 请求返回 返回 [JOSN] 非对象返回 [raw=响应内容]
+- 错误返回 ['err'=>500,'msg'=>'错误信息']
+```php
+httpProxy('https://example.com/',['method' => 'POST','headers'=>[]]); // 与 useRequest 一样使用
+```
 
 ### `虚拟文件上传` - `useVirtualFile`
 - @param string $url 上传地址
@@ -172,12 +162,24 @@ useRequest('https://example.com/',['method' => 'POST','headers'=>[]])
 useVirtualFile('https://upload.com/',[['file'=>['name'=>'test.txt','mime'=>'text/plain','data'=>'test data']]]);
 ```
 
+> 算法相关
 
+### `Base58编码解码` - `useBase58`
+- @param int|string $input int：编码数字 string：解码字符串
+- @param int $digits 随机混淆盐位数，默认3
+- @return int|string 编码数字|解码字符串
+```php
+$uuid = useIncrBy('uuid'); // 自增生成唯一ID
+$encode = useBase58($uuid); // 数字输入 输出短编码
+$decode = useBase58($encode); // 短编码输入 输出数字
+
+$decode === $uuid // true
+```
 ### `安全Base64编码` - `useBase64_encode`
 - @param string $string 待编码的字符串
 @return string 编码后的字符串
 ```php
-useBase64_encode('123')
+useBase64_encode('123') //
 ```
 
 
@@ -188,8 +190,36 @@ useBase64_encode('123')
 ```php
 useBase64_decode('ABC')
 ```
-> 腾讯相关
 
+### `AES128加解密` - `useAES128`
+> (AES-128-CBC)封装方便使用: 注意输入类型
+- @param string|array $input array=加密(数组转json加密)，string=解密(传入加密串)
+- @param string $salt 密钥原材料
+- @return array|string|false 加密返回safe-base64字符串；解密返回原数组；失败false
+```php
+useAES128('ABC','123') // 解密模式
+useAES128(['x'=>100],'123') // 加密模式
+```
+
+### `AES256加解密` - `useAES256`
+> (AES-256-CBC)封装方便使用: 注意输入类型
+- @param string|array $input array=加密(数组转json加密)，string=解密(传入加密串)
+- @param string $salt 密钥原材料
+- @return array|string|false 加密返回safe-base64字符串；解密返回原数组；失败false
+```php
+useAES256('ABC','123') // 解密模式
+useAES256(['x'=>100],'123') // 加密模式
+```
+
+### `Youloge加解密` - `useYouloge`
+> 平台专用洋葱加解密 (不包含签名生成算法Sign仅由平台内部使用)
+- @param string|array $input 待加密的数据
+- @param string $appid 配置参数主键 默认`youloge`
+- @return string|false 加密返回safe-base64字符串；解密返回原字符串；失败false
+```php
+useYouloge(['x'=>100]); // 加密模式
+useYouloge('ABC'); // 解密模式
+```
 
 ### `腾讯云请求体` - `useTencentRequest`
 - 构造腾讯云请求体: TC3-HMAC-SHA256
@@ -203,36 +233,51 @@ $options = tencent_request('POST','sms.tencentcloudapi.com/DescribePhoneNumberIn
 $request = useRequest(...$options); // 异步请求
 $request = httpProxy(...$options); // 代理请求
 ```
+ 
+> 七牛相关 [配置文件读取 qiniu.ak qiniu.sk]
 
-> 七牛相关
+### `七牛管理请求体` - `useQiniu`
+- @param string $method 请求方式 GET/POST/PUT/DELETE
+- @param string $uri 请求网址路径
+- @param array $query 查询参数
+- @param array|string $body 请求内容
+- @param string $appid 配置参数主键 默认`qiniu`
+```php
+useQiniu('GET','uc.qiniuapi.com/bucketTagging?bucket=<BucketName>'); // 查询<BucketName>的标签
+```
 
-### `七牛云私有下载链接` - `useQiniu_download`
+### `七牛管理请求体(老版)` - `useQiniuQbox`
+- @param string $method 请求方式 GET/POST/PUT/DELETE
+- @param string $uri 请求网址路径
+- @param array $query 查询参数
+- @param array|string $body 请求内容
+- @param string $appid 配置参数主键 默认`qiniu`
+```php
+useQiniuQbox('GET','uc.qiniuapi.com/bucketTagging?bucket=<BucketName>'); // 查询<BucketName>的标签
+```
+### `七牛云上传凭证` - `useQiniuToken`
+- @param array $params 待签名数组对象
+- @param string $appid 配置参数主键 默认`qiniu`
+- @return string 返回上传Token
+
+```php
+useQiniuToken([
+    'scope' => '<BucketName>:<Key>',
+    'deadline' => time() + 3600
+]);
+```
+
+### `七牛云下载链接` - `useQiniuDownload`
 - @param string $url 待签名下载网址
 - @param int $second 可选：设置有效时间 默认3600秒
 - @param string $attname 可选：设置下载文件名 默认没有
-
+- @return string 返回签名后的下载网址
 ```php
-useQiniu_download('https://example.com/1.jpg');
-useQiniu_download('https://example.com/1.jpg',500);
-useQiniu_download('https://example.com/1.jpg',500,'x.jpg');
+useQiniuDownload('https://example.com/1.jpg');
+useQiniuDownload('https://example.com/1.jpg',500);
+useQiniuDownload('https://example.com/1.jpg',500,'x.jpg');
 ```
 
-### `七牛签名` - `useQiniu_sign`
-- 用来生成Token
-- @param array $params 待签名数组对象
-- @return string 签名后的字符串
-```php
-useQiniu_sign(['bucket'=>'y','key'=>'x.jpg']); // 
-```
-
-### `七牛签名` - `useQiniu_auth`
-- 用来生成Token
-- @param array $params 待签名数组对象
-- @param string $ContentType 可选：设置请求头 Content-Type 默认application/json
-- @return array 返回请求头 ['Authorization: QBox token','Content-Type: application/json']
-```php
-useQiniu_auth(['bucket'=>'y','key'=>'x.jpg']); // 
-```
 
 > 算法类
 
@@ -253,17 +298,17 @@ usePrivateKeySign('123','1253985496');
 usePublicKeyVerify('123','123','1253985496');
 ```
 
-### `微信支付请求体构造` - `useWeixinRequest`
+### `微信支付请求体构造` - `useWeixinPayRequest`
 - @param string $method 请求网络方式 GET/POST
 - @param string $router 请求网络路径 必须'/'开头
 - @param array $data JSON数据 不传设置为 '' false 0 即可
 - @param string $appid 选择那个商户id下得的证书
 - @return array 返回请求体数组
 ```php
-useWeixinRequest('GET','/v3/certificates',[],'1253985496')
+useWeixinPayRequest('GET','/v3/certificates',[],'1253985496')
 ```
 
-### `微信支付回调验证` - `useWeixinVerify`
+### `微信支付回调验证` - `useWeixinPayVerify`
 - 微信支付回调验证 
 - @param object $request Request 给返回对象传进来
 - @param string $appid 选择那个商户id下得的证书
@@ -271,205 +316,37 @@ useWeixinRequest('GET','/v3/certificates',[],'1253985496')
 - @return array 失败返回 ['err'=>500,'msg'=>Exception]
 
 ```php
-useWeixinVerify($request,'1253985496')
+useWeixinPayVerify($request,'1253985496')
 ```
 
-### 示例：`腾讯云短信SMS号码查询`
-
-> 简单粗暴 不需要安装各种`腾讯云各种SDK`配好密钥 直接开干
+### `微信支付解密V3` - `useWeixinPayDecryptV3`
+- @param array $encrypt 解密数据 要有['ciphertext','nonce','associated_data'] 
+- @param string $mchid 选择那个商户id下得的证书
+- 成功返回 对象返回JSON 否则返回 ['raw'=>$raw]
+- 失败返回 ['err'=>500,'msg'=>Exception]
 
 ```php
-    // 第二个参数为一个组合 `接入点/方法/版本/区域(可选参数)`
-    $options = tencent_request('POST','sms.tencentcloudapi.com/DescribePhoneNumberInfo/2021-01-11/ap-nanjing',[
-            'PhoneNumberSet'=>['+8617605509012']
-        ],'1253985496');
-    $request = onRequest(...$options); // 异步请求
-    $request = httpProxy(...$options); // 代理请求
+useWeixinPayDecryptV3(); // 
 ```
 
-### 示例：`请求微信证书`
-
-> 就是这么简单 发起 JSAPI H5 支付都是同理，比如 JSAPI 支付`统一下单之后`在调用一下签名组装一下`payment`参数即可支付
-
+### `支付宝支付请求体构造` - `useAliPayRequest`
+- @param string $method  接口名称 alipay.trade.create ...
+- @param array $data  请求参数(公共参数可以在这里覆盖)
+- @param string $appid  选择那个商户id下得的证书
 ```php
-$options = weixin_request('GET','/v3/certificates',[],'商户ID');
-@['data'=>$data] = $request = onRequest(...$options);
-// 返回一个V3加密后的数组
-$list = [];
-foreach($data as ['serial_no'=>$serial_no,'encrypt_certificate'=>$encrypt_certificate]){
-	// 使用微信V3解密 weixin_decrypt
-	$certificate = weixin_decrypt($encrypt_certificate,'商户ID');
-	// 按照证书序列号`PEM格式`保存到本地
-	file_put_contents("$serial_no.pem",$certificate);
-	$list[$serial_no] = $certificate;
-}
-//
-return $list;
+useAliPayRequest(`alipay.trade.create`,[
+    'biz_content'=>[
+        // 支付参数
+    ],
+    'notify_url'=>'https://a.com'
+],12345678); // 返回请求 options
 ```
--
-### 示例：`上传JSON文件到七牛`
-
-> 上传`一个JSON片段文件`并指定保存文件名到`config/100.json`, 二进制数据没测试
-
+### `支付宝支付回调验证` - `useAliPayVerify`
+> 支付验证公钥是固定的：请在配置文件中配置
+- @param object $request Request 给返回对象传进来
+- @param string $appid  选择那个商户id下得的证书
+- 成功返回 对象返回JSON 否则返回 []
+- 失败返回 ['err'=>500,'msg'=>Exception]
 ```php
-     $url = qiniu_sign([
-        'scope'=>"buket:100.json",
-        'deadline'=>time()+300,
-        'forceSaveKey'=>true,
-        'saveKey'=>"config/100.json",
-        'returnBody'=>'{"err": 200,"hash": $(etag)}',
-        'insertOnly'=>0,
-    ]);
-    $data = json_encode([
-        'uuid'=>100,
-        'target'=>'https://www.abc.com',
-        'type'=>'1'
-    ]);
-    $file = ['name'=>"100.json",'mime'=>'application/json','data'=>$data];
-    @['err'=>$err,'hash'=>$hash] = $virtual = virtualFile("https://upload.qiniup.com/?token=$url",['file'=>$file],['key'=>'100']);
-```
-
-### 示例：`代理请求网网址`
-
-> 网站支持`github登录`服务器在国内，运营商会屏蔽你的访问，这时候可以使用代理请求，数据结构与`onRequest` 一样
-
-```php
-    @['appid'=>$appid,'code'=>$code] = $request->all();
-    @['secret'=>$secret] = config("youloge.$appid"); // 配置参数格式统一起来
-    // 换取`access_token`
-    @['access_token'=>$access_token] = $data = `httpProxy`(
-    "https://github.com/login/oauth/access_token?client_id=$appid&client_secret=$secret&code=$code",[
-      'headers'=>[
-        'Accept'=>'application/json'
-        ]
-    ]);
-    if($access_token == null){ return ['err'=>100800,'msg'=>'Github授权失败']; }
-    // 获取用户信息
-    @['email'=>$mail] = $data = httpProxy('https://api.github.com/user',[
-      'headers'=>['Authorization'=>"Bearer $access_token",'Accept'=>'application/json','User-Agent'=>'Youloge-API']
-    ]);
-    if($mail == null){ return ['err'=>100801,'msg'=>'Github账户未认证']; }
-    // 用登录信息 查询数据库 ...
-
-```
-
----
-
-## 代码工具箱
-
----
-
-### 安全的 base64 编码
-
-```php
-safe_base64_encode($data);
-safe_base64_decode($data);
-```
-
-### 生成不重复字符 - 用于验证码
-
-- 使用 Base32 字符集 ABCDEFGHIJKLMNOPQRSTUVWXYZ234567
-- @param int $len=4 长度
-
-```php
-rand_base32($len=4)
-```
-
-### 生成重复的字符 - 用于密钥密码
-
-- 使用 Base32 字符集
-- @param int $len=16 长度
-- @param string $prefix='' 前缀
-
-```php
-secret_base32($len=16,$prefix='')
-```
-
-### Mysql 实例
-
-- 推荐使用 模型
-- [laravel 数据库](https://github.com/illuminate/database)
-- @param string $table 表名
-
-```php
-onMysql($table)
-```
-
-### Redis 实例 - 配置文件读取默认
-
-- 返回句柄
-
-```php
-onRedis()
-```
-
-### Redis 数组执行(自动 close)
-
-- runRedis('HGET',["wallet",$uuid])
-- runRedis('HINCRBY',["wallet",$uuid,10])
-
-```php
-runRedis($method,$params)
-```
-
-### [webman-queue] 队列封装
-
-- @param string $queue 队列名称
-- @param array $data 数据
-- @param int $delay 可选：延迟时间
-
-```php
-     onQueue($queue,$data,$delay=0)
-```
-
-### [http-client] 异步网络请求封装
-
-- @param string $url 请求网址
-- @param array $options 请求配置
-- 示例：'https://example.com/', ['method' => 'POST','version' => '1.1','headers' => ['Connection' => 'keep-alive'],'data' => ['key1' => 'value1', 'key2' => 'value2'],]
-- 请求返回 返回 [JOSN] 非对象返回 [raw=响应内容]
-- 错误返回 ['err'=>500,'msg'=>'错误信息']
-
-```php
-     onRequest($url,$options=[])
-```
-
----
-
-网络代理 微信支付/支付宝 都需`config/youloge.php` 配置文件
-
----
-
-### HTTP 代理网络请求 - 配置文件随机读取 [youloge.proxy[0~n]]
-
-- 请求参数与 httpProxy == onRequest == http-client(request) 一样
-- @param string $url 请求网址
-- @param array $options 请求配置
-
-```php
-     httpProxy($url,$options=[])
-```
-
-### 生成虚拟文件对象并上传 - 支持多文件
-
-- @param string $url 上传地址
-- @param array $files 文件类型数据 ['表单名称'=>['name'=>'文件名称','mime'=>'文件类型','data'=>'数据内容']]
-- @param array $body 其他表单数据
-- @param array $header 其他表单请求头
-- @return array 上传结果
-
-```php
-     virtualFile($url,$files,$body=[],$header=[])
-```
-
-
-### 读取配置文件参数 - `ini`
-- @param string $keys 配置路径
-- @param string $def 默认值
-- @return string|array 返回值
-
-```php
-ini(null) // 返回全部配置
-ini('MYSQL','默认值') // 返回一级配置[数组]
-ini('MYSQL.HOST') // 返回二级配置[字符串]
+useAliPayVerify($request,'alipay');
 ```
