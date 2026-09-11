@@ -513,24 +513,21 @@ if (!function_exists('useAES128')) {
      * AES-128-CBC 加密解密
      * 
      * @param string|array $input array=加密(数组转json加密)，string=解密(传入加密串)
-     * @param string $salt 密钥原材料
+     * @param string $salt 密钥盐 默认空
+     * @param string $info 标记用途 默认空
      * @return array|string|false 加密返回safe-base64字符串；解密返回原数组；失败false
      */
-    function useAES128($input, $salt = '')
+    function useAES128($input, $salt = '', $info = '')
     {
         // 派生密钥
-        $key = hash_hkdf('sha256', $salt, 16);
+        $key = hash_hkdf('sha256', $salt, 16, $info);
         try {
             // 加密
             if (is_array($input)) {
-                $jsonStr = json_encode($input, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
                 $iv = openssl_random_pseudo_bytes(16); // CBC固定16字节iv
-                $cipherRaw = openssl_encrypt($jsonStr, 'AES-128-CBC', $key, OPENSSL_RAW_DATA, $iv);
-                if ($cipherRaw === false) {
-                    return false;
-                }
+                $cipherRaw = openssl_encrypt(json_encode($input, 320), 'AES-128-CBC', $key, OPENSSL_RAW_DATA, $iv);
                 // iv(16字节) + 密文，然后url安全base64
-                return useBase64_encode($iv . $cipherRaw);
+                return $cipherRaw ? useBase64_encode($iv . $cipherRaw) : false;
             }
             // 解密
             if (is_string($input)) {
@@ -542,11 +539,7 @@ if (!function_exists('useAES128')) {
                 $iv = substr($raw, 0, 16);
                 $cipherRaw = substr($raw, 16);
                 $decryptStr = openssl_decrypt($cipherRaw, 'AES-128-CBC', $key, OPENSSL_RAW_DATA, $iv);
-                if ($decryptStr === false) {
-                    return false;
-                }
-                $data = json_decode($decryptStr, true);
-                return $data;
+                return $decryptStr ? json_decode($decryptStr, true) : false;
             }
             return false;
         } catch (\Throwable $th) {
@@ -559,24 +552,22 @@ if (!function_exists('useAES256')) {
      * AES-256-CBC 加密解密
      * 
      * @param string|array $input array=加密(数组转json加密)，string=解密(传入加密串)
-     * @param string $salt 密钥原材料
+     * @param string $salt 密钥盐 默认空
+     * @param string $info 标记用途 默认空
      * @return array|string|false 加密返回safe-base64字符串；解密返回原数组；失败false
      */
-    function useAES256($input, $salt = '')
+    function useAES256($input, $salt = '', $info = '')
     {
         // 派生密钥
-        $key = hash_hkdf('sha256', $salt, 32);
+        $key = hash_hkdf('sha256', $salt, 32, $info);
         try {
             // 加密
             if (is_array($input)) {
-                $jsonStr = json_encode($input, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                $iv = openssl_random_pseudo_bytes(16); // CBC固定16字节iv
+                $jsonStr = json_encode($input, 320);
+                $iv = openssl_random_pseudo_bytes(16);
                 $cipherRaw = openssl_encrypt($jsonStr, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
-                if ($cipherRaw === false) {
-                    return false;
-                }
                 // iv(16字节) + 密文，然后url安全base64
-                return useBase64_encode($iv . $cipherRaw);
+                return $cipherRaw ? useBase64_encode($iv . $cipherRaw) : false;
             }
             // 解密
             if (is_string($input)) {
@@ -588,11 +579,7 @@ if (!function_exists('useAES256')) {
                 $iv = substr($raw, 0, 16);
                 $cipherRaw = substr($raw, 16);
                 $decryptStr = openssl_decrypt($cipherRaw, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
-                if ($decryptStr === false) {
-                    return false;
-                }
-                $data = json_decode($decryptStr, true);
-                return $data;
+                return $decryptStr ? json_decode($decryptStr, true) : false;
             }
             return false;
         } catch (\Throwable $th) {
@@ -603,59 +590,55 @@ if (!function_exists('useAES256')) {
 if (!function_exists('useYouloge')) {
     /**
      * Youloge 洋葱加解密(不含签名验证)
-     * @param string|array $input 待加密的数据
+     * @param string|array $input 待加解密的数据
+     * @param string|null $info 签名密钥标记 默认`onion:hmac-v1` 如果配置为`null` 表示跳过HMAC签名校验(用于解密官方数据)
      * @param string $appid 配置参数主键 默认`youloge`
      * @return string|false 加密返回safe-base64字符串；解密返回原字符串；失败false
      */
-    function useYouloge($input, $appid = 'youloge')
+    function useYouloge($input, $info = 'onion:hmac-v1', $appid = 'youloge')
     {
         try {
             @['apikey' => $apikey, 'secret' => $secret] = pluginConfig($appid);
             if ($apikey === '' || $secret === '') {
                 return false;
             }
-
             $binary = useBase64_decode($secret);
-            if ($binary === false || strlen($binary) < 64) {
-                return false;
-            }
-            $keyInner = substr($binary, 0, 32);
-            $keyOuter = substr($binary, 32, 32);
+            // HMAC 派生密钥
+            $keyInner = hash_hkdf('sha256', $binary, 32, 'youloge:onion:inner-aes-v1');
+            $keyOuter = hash_hkdf('sha256', $binary, 32, 'youloge:onion:outer-aes-v1');
+            $keySiger = hash_hkdf('sha256', $binary, 32, $info);
 
             // 加密
             if (is_array($input)) {
-                $jsonRaw = json_encode($input, 320);
-                $ivInner = openssl_random_pseudo_bytes(16);
-                $innerBin = openssl_encrypt($jsonRaw, 'AES-256-CBC', $keyInner, OPENSSL_RAW_DATA, $ivInner);
+                $Raw = json_encode($input, 320);
+                $iv = openssl_random_pseudo_bytes(16);
+                $innerBin = openssl_encrypt($Raw, 'AES-256-CBC', $keyInner, OPENSSL_RAW_DATA, $iv);
                 if ($innerBin === false) return false;
-
-                $ivOuter = openssl_random_pseudo_bytes(16);
-                $outerBin = openssl_encrypt($innerBin, 'AES-256-CBC', $keyOuter, OPENSSL_RAW_DATA, $ivOuter);
+                $outerBin = openssl_encrypt($innerBin, 'AES-256-CBC', $keyOuter, OPENSSL_RAW_DATA, $iv);
                 if ($outerBin === false) return false;
-
-                // 打包：外层IV + 内层IV + 外层密文
-                $packBin = $ivOuter . $ivInner . $outerBin;
-                return useBase64_encode($packBin);
+                $sign = hash_hmac('sha256', $outerBin, $keySiger, false);
+                // 打包：IV + 外层密文 + 签名
+                return useBase64_encode($iv . $outerBin . $sign);
             }
 
             // 解密
             if (is_string($input)) {
                 $rawBin = useBase64_decode($input);
-                if ($rawBin === false || strlen($rawBin) < 32) {
-                    return false;
+                $iv = substr($rawBin, 0, 16);
+                $signPacked = substr($rawBin, -64);      // 永远取出末尾64字节签名
+                $cipherOuterBin = substr($rawBin, 16, -64); // 永远取出中间密文段
+                // 是否跳过签名验证
+                if ($info !== null && $keySiger !== null) {
+                    $calcSign = hash_hmac('sha256', $cipherOuterBin, $keySiger, false);
+                    if (!hash_equals($signPacked, $calcSign)) {
+                        return false;
+                    }
                 }
-                $ivOuter = substr($rawBin, 0, 16);
-                $ivInner = substr($rawBin, 16, 16);
-                $cipherOuterBin = substr($rawBin, 32);
-
-                $innerBin = openssl_decrypt($cipherOuterBin, 'AES-256-CBC', $keyOuter, OPENSSL_RAW_DATA, $ivOuter);
+                $innerBin = openssl_decrypt($cipherOuterBin, 'AES-256-CBC', $keyOuter, OPENSSL_RAW_DATA, $iv);
                 if ($innerBin === false) return false;
-
-                $jsonStr = openssl_decrypt($innerBin, 'AES-256-CBC', $keyInner, OPENSSL_RAW_DATA, $ivInner);
+                $jsonStr = openssl_decrypt($innerBin, 'AES-256-CBC', $keyInner, OPENSSL_RAW_DATA, $iv);
                 if ($jsonStr === false) return false;
-
-                $result = json_decode($jsonStr, true);
-                return $result ?? false;
+                return json_decode($jsonStr, true) ?? false;
             }
             return false;
         } catch (\Throwable $th) {

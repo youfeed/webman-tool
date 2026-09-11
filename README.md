@@ -20,12 +20,19 @@
 配置位置：`config\plugin\youloge\webman.tool\app.php`
 ```php
 <?php
-return [
+$config = [
     'enable' => true,
     'meilisearch' => [],
-
+    'qiniu01'=>['ak'=>'','sk'=>'']
+    ...
 ];
+$config['1232456']['cert'] =  <<<EOT
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+EOT;
 
+return $config;
 ```
 ### 项目地址
 
@@ -58,10 +65,12 @@ useLock('y',$token); 解锁
 - @param int $expire=300  写入时为缓存有效期; incr模式下代表自增步长(默认步长1)
 
 ```php
-useCache('y',['x'=>100,'y'=>200],300); // 缓存一个对象 有效期300秒
+useCache('y',['x'=>100,'y'=>200],600); // 缓存一个对象 有效期600秒
 useCache('y'); // 读取缓存对象
 useCache('y','ttl'); // 查看剩余有效期
 useCache('y','once'); // 读取缓存对象并删除对象
+useCache('x',100); // 缓存一个对象 有效期300秒
+useCache('x','incr',5); // 给缓存对象自增5 105
 ```
 
 ### `Redis 限速器` - `useLimits`
@@ -121,17 +130,6 @@ useAuthenticator('GQBWBS7AAEBECCUJ',1741877199); // 返回指定时间戳的验�
 useAuthenticator('GQBWBS7AAEBECCUJ','123456'); // 验证'123456' 是否在当前时间戳的验证码范围
 ```
 
-### `队列封装` - `useQueue`
-- @param string $queue 队列名称
-- @param array $data 数据
-- @param int|null $delay 可选：延迟时间
-- @return int 1 成功 0 失败
-
-```php
-useQueue('y',['x'=>100,'y'=>200]); // 添加数据到 y 队列
-useQueue('y',['x'=>100,'y'=>200],10); // 添加数据到 y 队列 10秒后消费
-```
-
 ### `异步网络请求封装` - `useRequest`
 - 使用的是：[http-client](https://www.workerman.net/doc/workerman/components/workerman-http-client.html)
 - @param string $url 请求网址
@@ -141,6 +139,7 @@ useQueue('y',['x'=>100,'y'=>200],10); // 添加数据到 y 队列 10秒后消费
 ```php
 useRequest('https://example.com/',['method' => 'POST','headers'=>[]])
 ```
+
 ### `HTTP代理网络请求` - `httpProxy`
 > 使用的`curl` 以后改为`workerman-http-client`
 - @param string $url 请求网址
@@ -175,13 +174,13 @@ $decode = useBase58($encode); // 短编码输入 输出数字
 
 $decode === $uuid // true
 ```
+
 ### `安全Base64编码` - `useBase64_encode`
 - @param string $string 待编码的字符串
 @return string 编码后的字符串
 ```php
 useBase64_encode('123') //
 ```
-
 
 ### `安全Base64解码` - `useBase64_decode`
 - @param string $data 待解码的数据
@@ -194,7 +193,8 @@ useBase64_decode('ABC')
 ### `AES128加解密` - `useAES128`
 > (AES-128-CBC)封装方便使用: 注意输入类型
 - @param string|array $input array=加密(数组转json加密)，string=解密(传入加密串)
-- @param string $salt 密钥原材料
+- @param string $salt 密钥盐 默认空
+- @param string $info 标记用途 默认空
 - @return array|string|false 加密返回safe-base64字符串；解密返回原数组；失败false
 ```php
 useAES128('ABC','123') // 解密模式
@@ -204,7 +204,8 @@ useAES128(['x'=>100],'123') // 加密模式
 ### `AES256加解密` - `useAES256`
 > (AES-256-CBC)封装方便使用: 注意输入类型
 - @param string|array $input array=加密(数组转json加密)，string=解密(传入加密串)
-- @param string $salt 密钥原材料
+- @param string $salt 密钥盐 默认空
+- @param string $info 标记用途 默认空
 - @return array|string|false 加密返回safe-base64字符串；解密返回原数组；失败false
 ```php
 useAES256('ABC','123') // 解密模式
@@ -213,12 +214,15 @@ useAES256(['x'=>100],'123') // 加密模式
 
 ### `Youloge加解密` - `useYouloge`
 > 平台专用洋葱加解密 (不包含签名生成算法Sign仅由平台内部使用)
-- @param string|array $input 待加密的数据
+- @param string|array $input 待加解密的数据
+- @param string|null $info 签名密钥标记 默认`onion:hmac-v1` 如果配置为`null` 表示跳过HMAC签名校验(用于解密官方数据)
 - @param string $appid 配置参数主键 默认`youloge`
-- @return string|false 加密返回safe-base64字符串；解密返回原字符串；失败false
+- @return string|array|false 加密返回safe-base64字符串；解密返回原字符串；失败false
+
 ```php
-useYouloge(['x'=>100]); // 加密模式
-useYouloge('ABC'); // 解密模式
+useYouloge(['x'=>100]); // 加密模式 输入数组
+useYouloge('ABC'); // 解密模式 输入字符串
+useYouloge('ABC',null); // 解密官方数据 例如ACCESS_TOKEN PAYLOAD
 ```
 
 ### `腾讯云请求体` - `useTencentRequest`
@@ -243,7 +247,8 @@ $request = httpProxy(...$options); // 代理请求
 - @param array|string $body 请求内容
 - @param string $appid 配置参数主键 默认`qiniu`
 ```php
-useQiniu('GET','uc.qiniuapi.com/bucketTagging?bucket=<BucketName>'); // 查询<BucketName>的标签
+$$options = useQiniu('GET','uc.qiniuapi.com/bucketTagging?bucket=<BucketName>'); // 查询<BucketName>的标签
+$request = useRequest(...$options); // 异步请求
 ```
 
 ### `七牛管理请求体(老版)` - `useQiniuQbox`
@@ -255,6 +260,7 @@ useQiniu('GET','uc.qiniuapi.com/bucketTagging?bucket=<BucketName>'); // 查询<B
 ```php
 useQiniuQbox('GET','uc.qiniuapi.com/bucketTagging?bucket=<BucketName>'); // 查询<BucketName>的标签
 ```
+
 ### `七牛云上传凭证` - `useQiniuToken`
 - @param array $params 待签名数组对象
 - @param string $appid 配置参数主键 默认`qiniu`
@@ -341,6 +347,7 @@ useAliPayRequest(`alipay.trade.create`,[
     'notify_url'=>'https://a.com'
 ],12345678); // 返回请求 options
 ```
+
 ### `支付宝支付回调验证` - `useAliPayVerify`
 > 支付验证公钥是固定的：请在配置文件中配置
 - @param object $request Request 给返回对象传进来
