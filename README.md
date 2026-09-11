@@ -357,3 +357,9 @@ useAliPayRequest(`alipay.trade.create`,[
 ```php
 useAliPayVerify($request,'alipay');
 ```
+
+
+
+> 但行好事 莫问前程
+
+![wallet.micateam](https://img.youloge.com/wallet/micateam!0)
