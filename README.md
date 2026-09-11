@@ -1,4 +1,4 @@
-# Youloge.tool Webman 辅助函数工具箱
+# Youloge-tool Webman 辅助函数工具箱
 
 ![Brightgreen](https://img.shields.io/badge/@-micateam-brightgreen.svg) ![Packagist](https://img.shields.io/packagist/v/youloge/webman-tool) ![Languages](https://img.shields.io/github/languages/top/youfeed/webman-tool.svg) ![Packagist Downloads](https://img.shields.io/packagist/dt/youloge/webman-tool) ![License ](https://img.shields.io/packagist/l/youloge/webman-tool)
 
@@ -71,6 +71,7 @@ return $config;
 
 [Github Youloge.Tool](https://github.com/youfeed/webman-tool) Star 我 `有帮助的话，记得给个star` 能提交点代码最好
 
+- 2.0.4 [2026-09-12] 修正包命名为`webman-tool`
 - 2.0.1 [2026-09-11] 全新`V2`版本 一般已`use开头`
 - 1.0.0 [2025-03-15]-[2026-03-11] V1版本不在更新先升级为全新`V2`版本
 
