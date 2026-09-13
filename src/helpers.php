@@ -126,38 +126,38 @@ if (!function_exists('useAuthenticator')) {
      * 使用Authenticator二次验证器：只支持TOTP
      * 
      * Authenticator 二次验证器
-     * @param int|string $secret 密钥|{label}|null
-     * @param int|string $params 验证码长度
-     * @return string 
-     * @return string 返回验证码
+     * @param string|null $secret 密钥|{label}|null
+     * @param int|string|null $params 验证码长度
+     * @return array|bool 返回验证码数组或验证结果
      * RFC4648 base32，Authenticator标准字符集 ABCDEFGHIJKLMNOPQRSTUVWXYZ234567
      */
     function useAuthenticator($secret = null, $params = null)
     {
         $char = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; // Base32字符集
-        // 生成 $secret = issuer:account
+        // 生成 $secret = account:issuer
         if (str_contains($secret, ':')) {
-            [$issuer, $account] = explode(':', $secret, 2);
+            @[$account, $issuer] = explode(':', $secret, 2);
             $length = is_int($params) ? $params : 16;
+            $_secret = '';
             for ($i = 0; $i < $length; $i++) {
-                $secret .= $char[rand(0, strlen($char) - 1)];
+                $_secret .= $char[rand(0, strlen($char) - 1)];
             }
             $label = "$account:$issuer";
             return [
                 'label' => "$label",
-                'secret' => $secret,
+                'secret' => $_secret,
                 'issuer' => $issuer,
                 'account' => $account,
-                'link' => "otpauth://totp/$account:$issuer?secret=$secret&issuer=$issuer"
+                'link' => "otpauth://totp/$account:$issuer?secret=$_secret&issuer=$issuer"
             ];
         }
+        // 校验密钥
         $secret = strtoupper(trim($secret));
         $base32Pattern = '/^[A-Z234567]+$/';
         if (!preg_match($base32Pattern, $secret)) {
             throw new \InvalidArgumentException('TOTP密钥非法', 102002);
         }
-        // 
-
+        // 验证码生成
         $char = array_flip(str_split('ABCDEFGHIJKLMNOPQRSTUVWXYZ234567')); // Base32字符集
         $length = strlen($secret);
         $buffer = 0;
@@ -174,13 +174,8 @@ if (!function_exists('useAuthenticator')) {
                 $bits -= 8;
             }
         }
-        $time = null;
-        if ($params === null) {
-            $time = floor(time() / 30);
-        }
-        if (is_int($params)) {
-            $time = floor($time / 30);
-        }
+        // 计算时间戳
+        $time = is_int($params) ? floor($params / 30) : floor(time() / 30);
         // 生成3组 6位验证码
         $pool = [$time - 1, $time, $time + 1];
         foreach ($pool as &$item) {
@@ -195,7 +190,7 @@ if (!function_exists('useAuthenticator')) {
             ) % pow(10, 6);
             $item = str_pad($code, 6, '0', STR_PAD_LEFT);
         }
-        return is_string($params) ? in_array($params, $pool) : $pool;
+        return is_string($params) ? in_array($params, $pool, true) : $pool;
     }
 }
 /**
@@ -742,65 +737,6 @@ if (!function_exists('useSecret')) {
                 $this->secret = '';
             }
         };
-    }
-}
-if (!function_exists('useYouloge')) {
-    /**
-     * Youloge 洋葱加解密(不含签名验证)
-     * @param string|array $input 待加解密的数据
-     * @param string|null $info 签名密钥标记 默认`onion:hmac-v1` 如果配置为`null` 表示跳过HMAC签名校验(用于解密官方数据)
-     * @param string $appid 配置参数主键 默认`youloge`
-     * @return string|false 加密返回safe-base64字符串；解密返回原字符串；失败false
-     */
-    function useYouloge($input, $info = 'onion:hmac-v1', $appid = 'youloge')
-    {
-        try {
-            @['apikey' => $apikey, 'secret' => $secret] = pluginConfig($appid);
-            if ($apikey === '' || $secret === '') {
-                return false;
-            }
-            $binary = useBase64_decode($secret);
-            // HMAC 派生密钥
-            $keyInner = hash_hkdf('sha256', $binary, 32, 'youloge:onion:inner-aes-v1');
-            $keyOuter = hash_hkdf('sha256', $binary, 32, 'youloge:onion:outer-aes-v1');
-            $keySiger = hash_hkdf('sha256', $binary, 32, $info);
-
-            // 加密
-            if (is_array($input)) {
-                $Raw = json_encode($input, 320);
-                $iv = openssl_random_pseudo_bytes(16);
-                $innerBin = openssl_encrypt($Raw, 'AES-256-CBC', $keyInner, OPENSSL_RAW_DATA, $iv);
-                if ($innerBin === false) return false;
-                $outerBin = openssl_encrypt($innerBin, 'AES-256-CBC', $keyOuter, OPENSSL_RAW_DATA, $iv);
-                if ($outerBin === false) return false;
-                $sign = hash_hmac('sha256', $outerBin, $keySiger, false);
-                // 打包：IV + 外层密文 + 签名
-                return useBase64_encode($iv . $outerBin . $sign);
-            }
-
-            // 解密
-            if (is_string($input)) {
-                $rawBin = useBase64_decode($input);
-                $iv = substr($rawBin, 0, 16);
-                $signPacked = substr($rawBin, -64);      // 永远取出末尾64字节签名
-                $cipherOuterBin = substr($rawBin, 16, -64); // 永远取出中间密文段
-                // 是否跳过签名验证
-                if ($info !== null && $keySiger !== null) {
-                    $calcSign = hash_hmac('sha256', $cipherOuterBin, $keySiger, false);
-                    if (!hash_equals($signPacked, $calcSign)) {
-                        return false;
-                    }
-                }
-                $innerBin = openssl_decrypt($cipherOuterBin, 'AES-256-CBC', $keyOuter, OPENSSL_RAW_DATA, $iv);
-                if ($innerBin === false) return false;
-                $jsonStr = openssl_decrypt($innerBin, 'AES-256-CBC', $keyInner, OPENSSL_RAW_DATA, $iv);
-                if ($jsonStr === false) return false;
-                return json_decode($jsonStr, true) ?? false;
-            }
-            return false;
-        } catch (\Throwable $th) {
-            return false;
-        }
     }
 }
 /**
