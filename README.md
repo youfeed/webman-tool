@@ -25,7 +25,8 @@
 | useBase64_decode | 安全Base64解码 | 方便调用 |
 | useAES128 | 加解密封装 | 方便调用 |
 | useAES256 | 加解密封装 | 方便调用 |
-| useYouloge | 洋葱加密 | 适合各种Token签发 |
+| useOnion | 洋葱加解密 | 双层加密数据并签名防篡改 |
+| useSecret | 受保护的密钥对象 | 创建一个保护对象不可打印内置(洋葱加解密) |
 | ---- | 七牛相关 | ---- |
 | useQiniu | 七牛管理请求体 | 新版 |
 | useQiniuQbox | 七牛管理请求体 | 旧版 |
@@ -72,6 +73,7 @@ return $config;
 
 [Github Youloge.Tool](https://github.com/youfeed/webman-tool) Star 我 `有帮助的话，记得给个star` 能提交点代码最好
 
+- 2.1.8 [2026-09-13] 新增`useOnion`,`useSecret`函数
 - 2.1.0 [2026-09-12] 新增`headRequest`,`useBase32`
 - 2.0.4 [2026-09-12] 修正包命名为`webman-tool`
 - 2.0.1 [2026-09-11] 全新`V2`版本 一般已`use开头`
@@ -268,17 +270,35 @@ useAES256('ABC','123') // 解密模式
 useAES256(['x'=>100],'123') // 加密模式
 ```
 
-### `Youloge加解密` - `useYouloge`
-> 平台专用洋葱加解密 (不包含签名生成算法Sign仅由平台内部使用)
-- @param string|array $input 待加解密的数据
-- @param string|null $info 签名密钥标记 默认`onion:hmac-v1` 如果配置为`null` 表示跳过HMAC签名校验(用于解密官方数据)
-- @param string $appid 配置参数主键 默认`youloge`
-- @return string|array|false 加密返回safe-base64字符串；解密返回原字符串；失败false
+### `洋葱双层加解密` - `useOnion`
+> 包结构固定：iv(16字节) + 外层AES密文 + HMAC-SHA256签名(64字节hex)
+- @param string $secret base64编码的主密钥（开发者独立密钥）
+- @param string|array $input array=加密数组，string=解密safe-base64密文
+- @param string|null $info 签名派生标记；null=解密读取签名段，但跳过HMAC校验
+- @return string|array|false 加密返回safe-base64；解密返回数组；失败false
+```php
+$encode = useOnion('SafeBase64',['x'=>100]); // 加密数据
+$encode = useOnion('SafeBase64',['x'=>100],'label:info'); // 加密数据+自定义签名标记
+// 解密数据
+$decode = useOnion('SafeBase64',$encode); // 无签名标记 则只解密密文不验证签名
+$decode = useOnion('SafeBase64',$encode,'label:info'); // 有签名标记 则解密密文并验证签名
+```
+
+
+
+### `创建受保护的密钥对象` - `useSecret`
+> 保护敏感数据不泄露返回前端 
+- @param string|null $secret safeBase64编码密钥，传null则读取`youloge.secret`配置
+- @return SecretInterface 返回一个对象
+- @method string encrypt(array $data, string $info = '') 加密一个对象
+- @method array|false decrypt(string $cipherText, string|null $info = '') 解密一个对象
 
 ```php
-useYouloge(['x'=>100]); // 加密模式 输入数组
-useYouloge('ABC'); // 解密模式 输入字符串
-useYouloge('ABC',null); // 解密官方数据 例如ACCESS_TOKEN PAYLOAD
+$secret = useSecret('SafeBase64'); 
+print_r($secret); // 直接打印或toString为空
+$encrypt = $secret->encrypt(['x'=>100],'label:info'); // 加密对象
+$decrypt = $secret->decrypt($encrypt,'label:info'); // 解密对象
+$decrypt = $secret->decrypt($encrypt,null); // 解密对象但是忽略签名验证(*)
 ```
 
 ### `腾讯云请求体` - `useTencentRequest`

@@ -305,7 +305,7 @@ if (!function_exists('httpProxy')) {
         }
     }
 }
-if(!function_exists('headRequest')){
+if (!function_exists('headRequest')) {
     /**
      * 发起HEAD请求
      * @param string $url 完整URL
@@ -314,7 +314,8 @@ if(!function_exists('headRequest')){
      * 成功 成功 ['Headers'=>[], 'Request'=>[]]
      * 失败 ['err'=>500,'msg'=>'错误信息']
      */
-    function headRequest($url,$options=[]){
+    function headRequest($url, $options = [])
+    {
         static $http;
         $http || $http = new Workerman\Http\Client([
             'max_conn_per_addr' => 128, // 每个域名最多维持多少并发连接
@@ -328,7 +329,6 @@ if(!function_exists('headRequest')){
         } catch (\Exception $e) {
             return ['err' => 500, 'msg' => $e->getMessage()];
         }
-        
     }
 }
 if (!function_exists('virtualFile')) {
@@ -449,13 +449,14 @@ if (!function_exists('vipMeilisearch')) {
  * = 算法相关
  * =============================
  */
-if(!function_exists('useBase32')){
+if (!function_exists('useBase32')) {
     /**
      * 生成指定长度Base32字符
      * @param int $len 长度 默认5
      * @return string Base32字符串
      */
-    function useBase32($len=5){
+    function useBase32($len = 5)
+    {
         return substr(str_shuffle("23456789ABCDEFGHJKLMNPQRSTUVWXYZ"), 0, $len);
     }
 }
@@ -621,6 +622,126 @@ if (!function_exists('useAES256')) {
         } catch (\Throwable $th) {
             return false;
         }
+    }
+}
+if (!function_exists('useOnion')) {
+    /**
+     * 洋葱双层AES加解密，密钥由参数传入
+     * @param string $secret base64编码的主密钥（开发者独立密钥）
+     * @param string|array $input array=加密数组，string=解密safe-base64密文
+     * @param string|null $info 签名派生标记；null=解密读取签名段，但跳过HMAC校验
+     * @return string|array|false 加密返回safe-base64；解密返回数组；失败false
+     */
+    function useOnion($secret, $input, $info = 'youloge:onion:hmac')
+    {
+        try {
+            $binary = useBase64_decode($secret) ?? $secret;
+            // HKDF派生子密钥
+            $keyInner = hash_hkdf('sha256', $binary, 32, 'youloge:onion:inner-aes-v1');
+            $keyOuter = hash_hkdf('sha256', $binary, 32, 'youloge:onion:outer-aes-v1');
+            $keySiger = hash_hkdf('sha256', $binary, 32, $info);
+            // ========== 加密 ==========
+            if (is_array($input)) {
+                $Raw = json_encode($input, 320);
+                if ($Raw === false) return false;
+                $iv = openssl_random_pseudo_bytes(16);
+                $innerBin = openssl_encrypt($Raw, 'AES-256-CBC', $keyInner, OPENSSL_RAW_DATA, $iv);
+                if ($innerBin === false) return false;
+                $outerBin = openssl_encrypt($innerBin, 'AES-256-CBC', $keyOuter, OPENSSL_RAW_DATA, $iv);
+                if ($outerBin === false) return false;
+                $sign = hash_hmac('sha256', $outerBin, $keySiger, false);
+                return useBase64_encode($iv . $outerBin . $sign);
+            }
+            // ========== 解密 ==========
+            if (is_string($input)) {
+                $rawBin = useBase64_decode($input);
+                if ($rawBin === false) return false;
+                $minLen = 16 + 64;
+                if (strlen($rawBin) < $minLen) return false;
+                $iv = substr($rawBin, 0, 16);
+                $signPacked = substr($rawBin, -64);
+                $cipherOuterBin = substr($rawBin, 16, -64);
+                // info不为null则校验HMAC；info=null只读取签名不校验
+                if ($info !== null) {
+                    $calcSign = hash_hmac('sha256', $cipherOuterBin, $keySiger, false);
+                    if (hash_equals($signPacked, $calcSign) === false) return false;
+                }
+                $innerBin = openssl_decrypt($cipherOuterBin, 'AES-256-CBC', $keyOuter, OPENSSL_RAW_DATA, $iv);
+                if ($innerBin === false) return false;
+                $jsonStr = openssl_decrypt($innerBin, 'AES-256-CBC', $keyInner, OPENSSL_RAW_DATA, $iv);
+                if ($jsonStr === false) return false;
+                return json_decode($jsonStr, true) ?? false;
+            }
+            return false;
+        } catch (\Throwable $th) {
+            return false;
+        }
+    }
+}
+if (!function_exists('useSecret')) {
+    /**
+     * 创建受保护的密钥对象
+     * @param string|null $secret safeBase64编码密钥，传null则读取config配置
+     * @return SecretInterface 返回一个对象
+     * @method string encrypt(array $data, string $info = '') 加密一个对象
+     * @method array|false decrypt(string $cipherText, string|null $info = '') 解密一个对象
+     * 
+     */
+    function useSecret(?string $secret = null): SecretInterface
+    {
+        // 如果不传secret，从配置读取
+        if ($secret === null) {
+            $cfg = pluginConfig('youloge');
+            $secret = $cfg['secret'] ?? '';
+        }
+        return new class($secret) implements SecretInterface {
+            private string $secret;
+            public function __construct(string $text)
+            {
+                $this->secret = $text;
+            }
+            public function encrypt(array $data, string $info = ''): string|false
+            {
+                return useOnion($this->secret, $data, $info);
+            }
+
+            public function decrypt(string $cipherText, ?string $info = ''): array|false
+            {
+                return useOnion($this->secret, $cipherText, $info);
+            }
+            /**
+             * @return string 原样返回
+             */
+            public function get(): string
+            {
+                return $this->secret;
+            }
+            /**
+             * @return string 二进制
+             */
+            public function binary(): string
+            {
+                return useBase64_decode($this->secret, true);
+            }
+            public function __toString(): string
+            {
+                return '******[PROTECTED_SECRET]******';
+            }
+            public function __debugInfo(): array
+            {
+                return [
+                    'notice' => '敏感数据已屏蔽，调用 ->get() 或 ->binary() 获取内容'
+                ];
+            }
+            public function __sleep(): array
+            {
+                return [];
+            }
+            public function __wakeup(): void
+            {
+                $this->secret = '';
+            }
+        };
     }
 }
 if (!function_exists('useYouloge')) {
@@ -1439,4 +1560,20 @@ if (!function_exists('array_is_list')) {
     {
         return $arg === [] || (array_keys($arg) === range(0, count($arg) - 1));
     }
+}
+// 接口
+interface SecretInterface
+{
+    /**
+     * encrypt 一个对象
+     * @param array $data 待加密的数组对象
+     * @param string $info 派生签名标记
+     */
+    public function encrypt(array $data, string $info = ''): string|false;
+    /**
+     * decrypt 一个对象
+     * @param string $cipherText 待解密的密文
+     * @param string|null $info 派生签名标记
+     */
+    public function decrypt(string $cipherText, string|null $info = ''): array|false;
 }
